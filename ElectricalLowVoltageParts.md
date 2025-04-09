@@ -1,5 +1,8 @@
 * 12v Car Battery
-* Bussman Fused Relay 37702-2AA0022-W19 - $20.00 - <https://www.thunderstruck-ev.com/bussman-fused-relay.html>
+* Bussman Fused Relay 37702-2AA0022 - $20.00 - <https://www.waytekwire.com/product/eaton-s-bussmann-series-power-relay-module-70a-37702-2aa0022>
+* Fused Relay Output Connector - $3.96 - <https://www.waytekwire.com/product/eaton-s-bussmann-series-32004-a2-sealed>
+* Fused Relay Trigger Connector - $0.89 - <https://www.waytekwire.com/product/aptiv-12052641-metri-pack-150-series-2-way>
+* (2) Fused Relay JCase Fuse - - <https://catalog.waytekwire.com/Waytek-2025-Catalog-237/284/>
 * Raspberry Pi 4 - $55.00 - <https://www.digikey.com/en/products/detail/raspberry-pi/SC0194-9/10258781>
 * SparkFun COM-18375 - Buck Converter - $13.69 - <https://www.digikey.com/en/products/detail/sparkfun-electronics/COM-18375/17829516>
 * Raspberry PI GPIO Expansion - $24.90 - <https://www.digikey.com/en/products/detail/dfrobot/DFR0918/18069297>

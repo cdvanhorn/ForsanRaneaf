@@ -482,6 +482,9 @@
             </Array>
           </mxGeometry>
         </mxCell>
+        <mxCell id="W_Us8JAvx6CatEnuAjMm-65" value="Assume almost everything grounded to chassis" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="920" y="490" width="150" height="80" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

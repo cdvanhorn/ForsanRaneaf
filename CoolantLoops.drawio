@@ -359,6 +359,9 @@
             <mxPoint x="700" y="390" as="targetPoint" />
           </mxGeometry>
         </mxCell>
+        <mxCell id="wSDJM-9C2P7-PzqC946q-101" value="Y-Fittings may have to go after the Switched Y-Valve" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="420" y="650" width="340" height="30" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

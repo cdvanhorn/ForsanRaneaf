@@ -9,6 +9,7 @@
 * Raspberry PI GPIO Expansion - $24.90 - <https://www.digikey.com/en/products/detail/dfrobot/DFR0918/18069297>
 * Raspberry PI Touch Screen - $60.00 - <https://www.digikey.com/en/products/detail/raspberry-pi/8997466/6152806>
 * Raspberry Pi Pico - $4.00 - <https://www.digikey.com/en/product-highlight/r/raspberry-pi/raspberry-pi-picoboard>
+* Raspberry Pi Pico Terminal Board - $29.94 - <https://www.digikey.com/en/products/detail/adafruit-industries-llc/5096/14555485>
 * (2) Bussmann Fuse Panel - $46.26 - <https://www.waytekwire.com/product/eaton-s-bussmann-15305-2-2-4-mini-fuse-panel>
 * Fuse Panel Terminals and Seals
   * Terminals

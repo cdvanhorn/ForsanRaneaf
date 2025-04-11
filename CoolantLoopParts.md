@@ -6,4 +6,12 @@
 * Y Fitting - - <>
 * (2) Tempeture Sensors - - <>
 * Various Hose Sizes
-* Various Hose Clamp Sizes 
+* Various Hose Clamp Sizes
+* Coolant Heater - - <>
+* 97 Ford Ranger Radiator - - <>
+* Radiator 12v Fan - - <>
+* 97 Ford Ranger Heater Core - - <>
+* Battery Cooling Plate
+  * Stuff
+
+* Need to figure out hose and fitting sizes

@@ -4,12 +4,10 @@
 * Fused Relay Output Connector - $3.96 - <https://www.waytekwire.com/product/eaton-s-bussmann-series-32004-a2-sealed>
 * Fused Relay Trigger Connector - $0.89 - <https://www.waytekwire.com/product/aptiv-12052641-metri-pack-150-series-2-way>
 * (2) Fused Relay JCase Fuse - - <https://catalog.waytekwire.com/Waytek-2025-Catalog-237/284/>
-* Raspberry Pi 4 - $55.00 - <https://www.digikey.com/en/products/detail/raspberry-pi/SC0194-9/10258781>
+* (2) Raspberry Pi 4 - $55.00 - <https://www.digikey.com/en/products/detail/raspberry-pi/SC0194-9/10258781>
 * (2) SparkFun COM-18375 - Buck Converter - $13.69 - <https://www.digikey.com/en/products/detail/sparkfun-electronics/COM-18375/17829516>
-* Raspberry PI GPIO Expansion - $24.90 - <https://www.digikey.com/en/products/detail/dfrobot/DFR0918/18069297>
 * Raspberry PI Touch Screen - $60.00 - <https://www.digikey.com/en/products/detail/raspberry-pi/8997466/6152806>
-* Raspberry Pi Pico - $4.00 - <https://www.digikey.com/en/product-highlight/r/raspberry-pi/raspberry-pi-picoboard>
-* Raspberry Pi Pico Terminal Board - $29.94 - <https://www.digikey.com/en/products/detail/adafruit-industries-llc/5096/14555485>
+* (2) Raspberry Pi 8 Relay Board - $22.99 - <https://www.waveshare.com/product/modules/others/power-relays/rpi-relay-board-b.htm>
 * (2) Bussmann Fuse Panel - $46.26 - <https://www.waytekwire.com/product/eaton-s-bussmann-15305-2-2-4-mini-fuse-panel>
 * Fuse Panel Terminals and Seals
   * Terminals

@@ -373,6 +373,46 @@
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-27" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="920" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-28" value="Entertainment Power Switch" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="230" y="935" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-29" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="gq_4tyVKBIpzE4OVgXzM-27" target="tAwJRhMrhEr3Eam-5xzc-29">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="500" y="820" as="sourcePoint" />
+            <mxPoint x="600" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-30" value="Label" style="edgeLabel;resizable=0;html=1;;align=center;verticalAlign=middle;" connectable="0" vertex="1" parent="gq_4tyVKBIpzE4OVgXzM-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-31" value="Audio On/Off" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="gq_4tyVKBIpzE4OVgXzM-29">
+          <mxGeometry x="-0.0319" y="1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-32" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="510" y="775" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-33" value="Amp Relay" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="540" y="790" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-34" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tAwJRhMrhEr3Eam-5xzc-29" target="gq_4tyVKBIpzE4OVgXzM-32">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="500" y="820" as="sourcePoint" />
+            <mxPoint x="600" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-35" value="Label" style="edgeLabel;resizable=0;html=1;;align=center;verticalAlign=middle;" connectable="0" vertex="1" parent="gq_4tyVKBIpzE4OVgXzM-34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="gq_4tyVKBIpzE4OVgXzM-36" value="Activate" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="gq_4tyVKBIpzE4OVgXzM-34">
+          <mxGeometry x="0.0615" y="4" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

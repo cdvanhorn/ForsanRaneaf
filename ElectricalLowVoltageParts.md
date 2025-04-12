@@ -28,3 +28,6 @@
 * Ground Bars and Straps
 * Good Zip Ties
 * Delphi DC-DC Convertor - $450.00 - <https://www.thunderstruck-ev.com/delphi-dc-dc-converter-used.html>
+* Pi DAC - $20.00 - <https://www.canakit.com/iqaudio-dac-plus.html>
+* Audio Amplifier - - <>
+* Pi AM/FM Tuner - - <>

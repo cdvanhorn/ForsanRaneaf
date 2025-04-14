@@ -29,5 +29,6 @@
 * Good Zip Ties
 * Delphi DC-DC Convertor - $450.00 - <https://www.thunderstruck-ev.com/delphi-dc-dc-converter-used.html>
 * Pi DAC - $20.00 - <https://www.canakit.com/iqaudio-dac-plus.html>
-* Audio Amplifier - - <>
-* Pi AM/FM Tuner - - <>
+* Sony XMS400D Audio Amplifier - $149.99 - <https://www.crutchfield.com/p_158XMS400D/Sony-XMS400D.html>
+* Pi FM Tuner - $13.95 - <https://www.sparkfun.com/sparkfun-fm-tuner-basic-breakout-si4703.html>
+* Pi Can Hat - $59.95 - <https://copperhilltech.com/pican-2-can-bus-interface-for-raspberry-pi/>

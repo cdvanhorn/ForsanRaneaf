@@ -10,7 +10,7 @@
 * Raspberry Pi 4 Terminal Board - $24.90 - <https://www.digikey.com/en/products/detail/dfrobot/DFR0918/18069297>
 * Raspberry Pi A+ - $25.00 - <https://www.canakit.com/raspberry-pi-model-a-plus.html?cid=usd&src=raspberrypi>
 * Raspberry Pi 8 Relay Board - $22.99 - <https://www.waveshare.com/product/modules/others/power-relays/rpi-relay-board-b.htm>
-* (2) Bussmann Fuse Panel - $46.26 - <https://www.waytekwire.com/product/eaton-s-bussmann-15305-2-2-4-mini-fuse-panel>
+* (3) Bussmann Fuse Panel - $46.26 - <https://www.waytekwire.com/product/eaton-s-bussmann-15305-2-2-4-mini-fuse-panel>
 * Fuse Panel Terminals and Seals
   * Terminals
     * 18 - 16 AWG - <https://www.waytekwire.com/product/aptiv-12110847-metri-pack-280-series-18-16-ga>
@@ -21,7 +21,7 @@
     * 16 - 14 AWG - <https://www.waytekwire.com/item/39001/Aptiv-15324980-Metri-Pack-280/>
     * 14 - 12 AWG - <https://www.waytekwire.com/item/39002/Aptiv-15324981-Metri-Pack-280-Series-Cable-Seal-/>
   * Fuse Panel Plug - <https://www.waytekwire.com/product/aptiv-12010300-1-way-cable-cavity-plug-seal>
-* (4) Fuse Panel Mounting Bracket - $7.30 - <https://www.waytekwire.com/product/eaton-s-bussmann-series-b028-7012-0-j-mounting>
+* (6) Fuse Panel Mounting Bracket - $7.30 - <https://www.waytekwire.com/product/eaton-s-bussmann-series-b028-7012-0-j-mounting>
 * GXL Automotive Wire - <https://www.wirebarn.com/GXL-HIGH-TEMPERATURE-WIRE_c_4.html>
 * ATM Mini Fuses
 * Picker Micro Relays

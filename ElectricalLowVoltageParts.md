@@ -5,12 +5,12 @@
 * Fused Relay Trigger Connector - $0.89 - <https://www.waytekwire.com/product/aptiv-12052641-metri-pack-150-series-2-way>
 * (2) Fused Relay JCase Fuse - - <https://catalog.waytekwire.com/Waytek-2025-Catalog-237/284/>
 * Raspberry Pi 4 - $55.00 - <https://www.digikey.com/en/products/detail/raspberry-pi/SC0194-9/10258781>
-* (2) SparkFun COM-18375 - Buck Converter - $13.69 - <https://www.digikey.com/en/products/detail/sparkfun-electronics/COM-18375/17829516>
+* (?) SparkFun COM-18375 - Buck Converter - $13.69 - <https://www.digikey.com/en/products/detail/sparkfun-electronics/COM-18375/17829516>
 * Raspberry PI Touch Screen - $60.00 - <https://www.digikey.com/en/products/detail/raspberry-pi/8997466/6152806>
 * Raspberry Pi 4 Terminal Board - $24.90 - <https://www.digikey.com/en/products/detail/dfrobot/DFR0918/18069297>
-* Raspberry Pi A+ - $25.00 - <https://www.canakit.com/raspberry-pi-model-a-plus.html?cid=usd&src=raspberrypi>
-* Raspberry Pi 8 Relay Board - $22.99 - <https://www.waveshare.com/product/modules/others/power-relays/rpi-relay-board-b.htm>
-* (3) Bussmann Fuse Panel - $46.26 - <https://www.waytekwire.com/product/eaton-s-bussmann-15305-2-2-4-mini-fuse-panel>
+* (4) ESP32 - S3
+* Elegoo 8 Channel Relay Board
+* (2) Bussmann Fuse Panel - $46.26 - <https://www.waytekwire.com/product/eaton-s-bussmann-15305-2-2-4-mini-fuse-panel>
 * Fuse Panel Terminals and Seals
   * Terminals
     * 18 - 16 AWG - <https://www.waytekwire.com/product/aptiv-12110847-metri-pack-280-series-18-16-ga>
@@ -31,4 +31,4 @@
 * Pi DAC - $20.00 - <https://www.canakit.com/iqaudio-dac-plus.html>
 * Sony XMS400D Audio Amplifier - $149.99 - <https://www.crutchfield.com/p_158XMS400D/Sony-XMS400D.html>
 * Pi FM Tuner - $13.95 - <https://www.sparkfun.com/sparkfun-fm-tuner-basic-breakout-si4703.html>
-* PiCAN2 Duo CAN-Bus Board - $85.95 - <https://copperhilltech.com/pican2-duo-can-bus-board-for-raspberry-pi/>
+* (2) ESP32 CAN Hat - $9.00 - <https://www.electrodragon.com/product/esp32-can-rs-485-wire-interface-shield/>

@@ -8,7 +8,7 @@
 * (?) SparkFun COM-18375 - Buck Converter - $13.69 - <https://www.digikey.com/en/products/detail/sparkfun-electronics/COM-18375/17829516>
 * Raspberry PI Touch Screen - $60.00 - <https://www.digikey.com/en/products/detail/raspberry-pi/8997466/6152806>
 * Raspberry Pi 4 Terminal Board - $24.90 - <https://www.digikey.com/en/products/detail/dfrobot/DFR0918/18069297>
-* (4) ESP32 - S3
+* (4) ESP32 - S3 - $15.00 - <https://www.mouser.com/ProductDetail/Espressif-Systems/ESP32-S3-DevKitC-1U-N8R8>
 * Elegoo 8 Channel Relay Board
 * (2) Bussmann Fuse Panel - $46.26 - <https://www.waytekwire.com/product/eaton-s-bussmann-15305-2-2-4-mini-fuse-panel>
 * Fuse Panel Terminals and Seals

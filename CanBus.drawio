@@ -1,6 +1,6 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0" version="26.2.10">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0" version="26.2.12">
   <diagram name="Page-1" id="iKHDxoP3e3c8g61aCmVX">
-    <mxGraphModel dx="804" dy="471" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+    <mxGraphModel dx="791" dy="460" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -51,7 +51,7 @@
         <mxCell id="-Nt2glwAs4H2hpeJJ2ZF-14" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="220" y="740" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="-Nt2glwAs4H2hpeJJ2ZF-15" value="Pi 4" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+        <mxCell id="-Nt2glwAs4H2hpeJJ2ZF-15" value="ESP32 CAN A" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
           <mxGeometry x="250" y="755" width="60" height="30" as="geometry" />
         </mxCell>
         <mxCell id="-Nt2glwAs4H2hpeJJ2ZF-16" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="-Nt2glwAs4H2hpeJJ2ZF-1" target="-Nt2glwAs4H2hpeJJ2ZF-10" edge="1">
@@ -81,31 +81,34 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="-Nt2glwAs4H2hpeJJ2ZF-21" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="740" y="240" width="120" height="60" as="geometry" />
+          <mxGeometry x="740" y="540" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="-Nt2glwAs4H2hpeJJ2ZF-22" value="Leaf Inverter" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="770" y="255" width="60" height="30" as="geometry" />
+          <mxGeometry x="770" y="555" width="60" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="-Nt2glwAs4H2hpeJJ2ZF-23" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" parent="1" source="-Nt2glwAs4H2hpeJJ2ZF-3" target="-Nt2glwAs4H2hpeJJ2ZF-21" edge="1">
+        <mxCell id="-Nt2glwAs4H2hpeJJ2ZF-23" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="-Nt2glwAs4H2hpeJJ2ZF-3" target="-Nt2glwAs4H2hpeJJ2ZF-21" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="530" y="480" as="sourcePoint" />
             <mxPoint x="580" y="430" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="8UFfk1EpxzEfu7s8c5b7-2" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="-Nt2glwAs4H2hpeJJ2ZF-21" target="-Nt2glwAs4H2hpeJJ2ZF-14">
+        <mxCell id="8UFfk1EpxzEfu7s8c5b7-5" value="In EV-CAN message 1DA, data bytes D5 and D6 (of D1 to D8) form&lt;br&gt;&lt;br/&gt;a 16-bit 2&#39;s comp number, apparently representing the motor RPM." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="540" y="730" width="390" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="I1FzJiN8SWNub0Jm0NNi-1" value="ESP32 CAN" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="520" y="140" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="I1FzJiN8SWNub0Jm0NNi-2" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="740" y="640" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="I1FzJiN8SWNub0Jm0NNi-3" value="ESP32 CAN B" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="770" y="655" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="I1FzJiN8SWNub0Jm0NNi-5" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="-Nt2glwAs4H2hpeJJ2ZF-21" target="I1FzJiN8SWNub0Jm0NNi-2">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="600" y="280" as="sourcePoint" />
-            <mxPoint x="650" y="230" as="targetPoint" />
+            <mxPoint x="540" y="600" as="sourcePoint" />
+            <mxPoint x="590" y="550" as="targetPoint" />
           </mxGeometry>
-        </mxCell>
-        <mxCell id="8UFfk1EpxzEfu7s8c5b7-3" value="CAN 1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="230" y="710" width="60" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="8UFfk1EpxzEfu7s8c5b7-4" value="CAN 2" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="380" y="740" width="60" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="8UFfk1EpxzEfu7s8c5b7-5" value="In EV-CAN message 1DA, data bytes D5 and D6 (of D1 to D8) form&lt;br&gt;&lt;br/&gt;a 16-bit 2&#39;s comp number, apparently representing the motor RPM." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="540" y="570" width="390" height="60" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

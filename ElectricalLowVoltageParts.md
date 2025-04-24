@@ -11,6 +11,7 @@
 * (4) ESP32 - S3 - $15.00 - <https://www.mouser.com/ProductDetail/Espressif-Systems/ESP32-S3-DevKitC-1U-N8R8>
 * Elegoo 8 Channel Relay Board
 * (2) Bussmann Fuse Panel - $46.26 - <https://www.waytekwire.com/product/eaton-s-bussmann-15305-2-2-4-mini-fuse-panel>
+* Bussman Fuse Panel For 5V - $41.15 - <https://www.waytekwire.com/product/eaton-s-bussmann-series-15305-1-2-3-mini-fuse>
 * Fuse Panel Terminals and Seals
   * Terminals
     * 18 - 16 AWG - <https://www.waytekwire.com/product/aptiv-12110847-metri-pack-280-series-18-16-ga>

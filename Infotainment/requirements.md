@@ -1,4 +1,5 @@
-C GUI application using raygui (https://github.com/raysan5/raygui) or Nuklear (https://github.com/Immediate-Mode-UI/Nuklear).
+## Requirements
+* C GUI application using raygui (https://github.com/raysan5/raygui) or Nuklear (https://github.com/Immediate-Mode-UI/Nuklear).
 * The application will display warnings and errors (MVP)
 * The application will display vehicle status (MVP)
 * The application will play audio files from filesystem using cmus and cmus-remote (https://cmus.github.io/#home)
@@ -9,3 +10,7 @@ C GUI application using raygui (https://github.com/raysan5/raygui) or Nuklear (h
 * The application will drive a serial display to display current speed for driver (https://www.digikey.com/en/products/detail/newhaven-display-intl/NHD-3-12-25664UMY3/3712528)
 * The application will drive a serial display to display current RPM for driver
 * The application will use a serial connection to the ESP32 cluster to retrieve vehicle status, warnings and errors (MVP)
+
+## Guides
+* https://madwonder.com/raylib-basic-setup/
+  

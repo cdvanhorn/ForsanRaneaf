@@ -15,4 +15,7 @@
 
 ## Guides
 * https://madwonder.com/raylib-basic-setup/
-  
+
+## Parts
+* https://geekworm.com/products/x825?variant=39330313568344
+* 1TB 2.5 SSD Drive

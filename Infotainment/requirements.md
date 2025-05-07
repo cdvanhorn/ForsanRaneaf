@@ -16,3 +16,4 @@
 
 ## Guides
 * https://madwonder.com/raylib-basic-setup/
+* https://forums.raspberrypi.com/viewtopic.php?t=343710

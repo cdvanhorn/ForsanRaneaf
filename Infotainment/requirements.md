@@ -9,6 +9,7 @@
 * The application will run in "kiosk" mode on the Raspberry Pi (MVP)
 * When the car is plugged in and can access the home wifi, the Raspberry Pi will rsync the music library
 * The application will drive a serial display to display current speed for driver (https://www.digikey.com/en/products/detail/newhaven-display-intl/NHD-3-12-25664UMY3/3712528)
+  * Or i2c display (https://www.sparkfun.com/sparkfun-qwiic-alphanumeric-display-green.html)
 * The application will drive a serial display to display current RPM for driver
 * The application will use a serial connection to the ESP32 cluster to retrieve vehicle status, warnings and errors (MVP)
 * Custom raylib audio player

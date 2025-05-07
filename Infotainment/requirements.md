@@ -13,7 +13,7 @@
 * The application will use a serial connection to the ESP32 cluster to retrieve vehicle status, warnings and errors (MVP)
 * Custom raylib audio player
 * MusicBrainz raylib player integration (https://musicbrainz.org/doc/MusicBrainz_API)
-* The application will require 6 digit code entry before allowing contactors to close and vehicle to drive
+* The application will require 6 digit code entry before allowing contactors to close and emergency brake to release and vehicle to drive
 
 ## Guides
 * https://madwonder.com/raylib-basic-setup/

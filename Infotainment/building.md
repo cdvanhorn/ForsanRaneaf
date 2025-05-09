@@ -43,3 +43,4 @@ You don't have to build raygui just copy the header to the project.
 # Building SQLite on Ubuntu WSL
 
 Doesn't need to be built, just download the amalgamation file (https://www.sqlite.org/download.html) and include it in the project.
+https://www.sqlite.org/howtocompile.html

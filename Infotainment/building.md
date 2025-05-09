@@ -17,7 +17,7 @@ make
 
 If using WSL2 with an Intel card, https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2023-0/configure-wsl-2-for-gpu-workflows.html
 
-Could not get it to work!
+Could not get it to work! :(
 
 # Building Raylib w/X11 on Ubuntu WSL
 ```shell
@@ -35,3 +35,11 @@ mkdir build && cd build
 cmake -DSUPPORT_FILEFORMAT_FLAC=ON ..
 make
 ```
+
+# Building Raygui w/X11 on Ubuntu WSL
+
+You don't have to build raygui just copy the header to the project.
+
+# Building SQLite on Ubuntu WSL
+
+Doesn't need to be built, just download the amalgamation file (https://www.sqlite.org/download.html) and include it in the project.

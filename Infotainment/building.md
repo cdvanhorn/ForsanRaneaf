@@ -15,8 +15,6 @@ cmake -DPLATFORM=DRM -DSUPPORT_FILEFORMAT_FLAC=ON ..
 make
 ```
 
-If using WSL2 with an Intel card, https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2023-0/configure-wsl-2-for-gpu-workflows.html
-
 Could not get it to work! :(
 
 # Building Raylib w/X11 on Ubuntu WSL

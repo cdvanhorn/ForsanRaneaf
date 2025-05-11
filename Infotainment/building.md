@@ -14,7 +14,6 @@ mkdir build && cd build
 cmake -DPLATFORM=DRM -DSUPPORT_FILEFORMAT_FLAC=ON ..
 make
 ```
-
 Could not get it to work! :(
 
 # Building Raylib w/X11 on Ubuntu WSL

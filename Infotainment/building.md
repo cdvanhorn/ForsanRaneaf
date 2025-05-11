@@ -41,7 +41,7 @@ mkdir build && cd build
 cmake -DPLATFORM=DRM -DSUPPORT_FILEFORMAT_FLAC=ON ..
 make
 ```
-Worked without issue.
+Worked without issue. 
 
 # Building Raygui w/X11 on Ubuntu WSL
 

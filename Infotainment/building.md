@@ -36,6 +36,16 @@ cmake -DSUPPORT_FILEFORMAT_FLAC=ON ..
 make
 ```
 
+# Building Raylib w/o X11 on Raspberry Pi
+```shell
+sudo apt install libdrm-dev libegl1-mesa-dev libgles2-mesa-dev libgbm-dev
+git clone https://github.com/raysan5/raylib.git raylib
+cd raylib
+mkdir build && cd build
+cmake -DPLATFORM=DRM -DSUPPORT_FILEFORMAT_FLAC=ON ..
+make
+```
+
 # Building Raygui w/X11 on Ubuntu WSL
 
 You don't have to build raygui just copy the header to the project.

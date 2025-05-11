@@ -23,7 +23,6 @@ sudo apt install build-essential git
 sudo apt install cmake
 sudo apt install libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev
 ```
-
 If cmake is too old, get it from their repository, https://askubuntu.com/questions/355565/how-do-i-install-the-latest-version-of-cmake-from-the-command-line
 
 ```shell

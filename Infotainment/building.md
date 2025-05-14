@@ -1,4 +1,4 @@
-# Building Raylib w/o X11 on Ubuntu WSL
+# Building Raylib w/o X11 on Ubuntu
 ```shell
 sudo apt install build-essential git
 sudo apt install cmake
@@ -16,7 +16,7 @@ make
 ```
 Could not get it to work! :(
 
-# Building Raylib w/X11 on Ubuntu WSL
+# Building Raylib w/X11 on Ubuntu
 ```shell
 sudo apt install build-essential git
 sudo apt install cmake

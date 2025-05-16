@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Configure the serial port
-	tty.c_cflag = B9600 | CS8 | CLOCAL | CREAD; // Set baud rate, data bits, and enable receiver
+	tty.c_cflag = B115200 | CS8 | CLOCAL | CREAD; // Set baud rate, data bits, and enable receiver
 	tty.c_iflag = IGNPAR; // Ignore parity errors
 	tty.c_oflag = 0; // Raw output
 	tty.c_lflag = 0; // Non-canonical mode

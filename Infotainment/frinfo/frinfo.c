@@ -8,7 +8,7 @@
 #include <stddef.h>
 
 /**
- * @breif main method of UI thread
+ * @brief main method of UI thread
  * @param args void pointer arguments to UI thread
  * @return void pointer to result of thread
  */
@@ -17,7 +17,7 @@ void *frinfo_ui(void *args) {
 }
 
 /**
- * @breif main method of serial communication thread
+ * @brief main method of serial communication thread
  * @param args void pointer arguments to serial communcation thread
  * @return void pointer to result of thread
  */
@@ -59,7 +59,7 @@ int frinfo_start(const struct frinfo_config *config) {
 }
 
 /**
- * @breif close the application
+ * @brief close the application
  * @return 0 on success 1 on failure
  */
 int frinfo_stop() {

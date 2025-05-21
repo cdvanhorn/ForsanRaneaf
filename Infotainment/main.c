@@ -1,5 +1,6 @@
 #include "utilities/ini_config.h"
 #include "utilities/logger.h"
+#include "frinfo/frinfo.h"
 
 #include <stddef.h>
 
@@ -21,6 +22,10 @@
 	inicfg_getuint8_t("simulation", "cps", &(cfg->sim_cps));
 }*/
 
+static void config_frinfo(struct frinfo_config *cfg) {
+
+}
+
 int main(int argc, char *argv[])
 {
 	if (log_open(LOG_DEBUG) > 0) {
@@ -31,7 +36,14 @@ int main(int argc, char *argv[])
 	inicfg_open();
 
 	// open serial reading thread
+	// char *setting;
+	// inicfg_getstring("serial", "path", &setting);
 	// open UI thread
+
+	struct frinfo_config frinfocfg;
+	config_frinfo(&frinfocfg);
+	frinfo_start(&frinfocfg);
+	frinfo_stop();
 
 	inicfg_close();
 

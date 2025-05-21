@@ -20,14 +20,18 @@ add_library(utilities OBJECT
         utilities/threading/threading.c
         utilities/timing.h
         utilities/timing/timing.c
-		utilities/serial.h
-		utilities/serial/serial.c
+        utilities/serial.h
+        utilities/serial/serial.c
 )
 
 add_executable(frinfo
         main.c
-		frinfo/frinfo.h
-		frinfo/frinfo.c
+        frinfo/frinfo.h
+        frinfo/frinfo.c
+        frinfo/serial_comm.h
+        frinfo/serial_comm.c
+        frinfo/ui.h
+        frinfo/ui.c
 )
 
 target_link_libraries(frinfo

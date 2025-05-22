@@ -4,69 +4,44 @@
 
 #include "frinfo.h"
 #include "../utilities/defines.h"
-
-#include <stddef.h>
-
-/**
- * @brief main method of UI thread
- * @param args void pointer arguments to UI thread
- * @return void pointer to result of thread
- */
-void *frinfo_ui(void *args) {
-    return NULL;
-}
-
-/**
- * @brief main method of serial communication thread
- * @param args void pointer arguments to serial communcation thread
- * @return void pointer to result of thread
- */
-void *frinfo_serial(void *args) {
-    /* algorithm:
-     * initialize serial connection
-     *
-     * loop:
-     * check if data to send out on serial connection
-     * if data to send lock send array
-     * send data on serial connection
-     * remove data form send array
-     * unlock send array
-     *
-     * check if data to read from serial connection
-     * if so read and parse data
-     * lock vehicle state
-     * update vehicle state
-     * unlock vehicle state
-     *
-     * close serial connection
-     */
-    return NULL;
-}
+#include "../utilities/logger.h"
+#include "../utilities/threading.h"
+#include "serial_comm.h"
+#include "ui.h"
 
 /**
  * @brief start the application with the given config
  * @param config pointer to frinfo_config defines settings for app
  * @return 0 on success 1 on failure
  */
-int frinfo_start(const struct frinfo_config *config) {
-    // algorithm:
-    // initialize frinfo object
-    // create a serial port communication thread
-    // create a UI thread
-    // start the threads
-    // wait for threads to finish
-    return FUNC_SUCCESS;
-}
+int frinfo_start(struct frinfo_config *config) {
+    struct frinfo fi;
+    fi.shutdown = false;
+    fi.config = config;
 
-/**
- * @brief close the application
- * @return 0 on success 1 on failure
- */
-int frinfo_stop() {
-    /*
-     * algorithm:
-     * if frinfo object exists free it
-     * close serial connection if exists
-     */
+    pthread_t comm_thread = 0;
+    log_write(LOG_TAG_INFO, "launching serial communication thread");
+    int rval = pthread_create(&comm_thread, NULL, serial_comm_loop, &fi);
+    if (rval != FUNC_SUCCESS) {
+        log_write(LOG_TAG_ERR, "failed to create serial communication thread");
+        return FUNC_FAILURE;
+    }
+
+    pthread_t ui_thread = 0;
+    log_write(LOG_TAG_INFO, "launching ui thread");
+    rval = pthread_create(&ui_thread, NULL, ui_loop, &fi);
+    if (rval != FUNC_SUCCESS) {
+        log_write(LOG_TAG_ERR, "failed to create ui thread");
+        // kill the communication thread if it is running
+        fi.shutdown = true;
+        if (comm_thread != 0) {
+            pthread_join(comm_thread, NULL);
+        }
+        return FUNC_FAILURE;
+    }
+
+    pthread_join(comm_thread, NULL);
+    pthread_join(ui_thread, NULL);
+
     return FUNC_SUCCESS;
 }

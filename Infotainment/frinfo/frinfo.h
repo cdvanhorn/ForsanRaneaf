@@ -23,9 +23,9 @@ struct frinfo_config {
  */
 struct frinfo {
     bool shutdown; //!< should the threads shutdown
+    struct frinfo_config *config; //!< pointer to configuration
 };
 
-extern int frinfo_start(const struct frinfo_config *config);
-extern int frinfo_stop();
+extern int frinfo_start(struct frinfo_config *config);
 
 #endif //FRINFO_H

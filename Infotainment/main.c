@@ -43,7 +43,6 @@ int main(int argc, char *argv[])
 	struct frinfo_config frinfocfg;
 	config_frinfo(&frinfocfg);
 	frinfo_start(&frinfocfg);
-	frinfo_stop();
 
 	inicfg_close();
 

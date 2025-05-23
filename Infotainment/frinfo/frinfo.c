@@ -27,21 +27,9 @@ int frinfo_start(struct frinfo_config *config) {
         return FUNC_FAILURE;
     }
 
-    pthread_t ui_thread = 0;
-    log_write(LOG_TAG_INFO, "launching ui thread");
-    rval = pthread_create(&ui_thread, NULL, ui_loop, &fi);
-    if (rval != FUNC_SUCCESS) {
-        log_write(LOG_TAG_ERR, "failed to create ui thread");
-        // kill the communication thread if it is running
-        fi.shutdown = true;
-        if (comm_thread != 0) {
-            pthread_join(comm_thread, NULL);
-        }
-        return FUNC_FAILURE;
-    }
+    // start the user interface
 
     pthread_join(comm_thread, NULL);
-    pthread_join(ui_thread, NULL);
 
     return FUNC_SUCCESS;
 }

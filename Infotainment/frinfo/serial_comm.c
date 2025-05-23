@@ -68,6 +68,7 @@ func_failure:
  * @brief Read data from serial connection and place in buffer
  * @return 0 on failure 1 on success
  */
+// https://www.msweet.org/serial/serial.html
 static int read_serial() {
     ssize_t bytes_read = read(serial_fd, buffer, sizeof(buffer));
     if (bytes_read < 0) {

@@ -51,3 +51,13 @@ You don't have to build raygui just copy the header to the project.
 
 Doesn't need to be built, just download the amalgamation file (https://www.sqlite.org/download.html) and include it in the project.
 https://www.sqlite.org/howtocompile.html
+
+# Building Turbo-Base64
+
+```shell
+git clone https://github.com/powturbo/Turbo-Base64
+cd Turbo-Base64
+mkdir build && cd build
+cmake ..
+make
+```

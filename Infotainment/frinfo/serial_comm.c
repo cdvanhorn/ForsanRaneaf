@@ -68,7 +68,24 @@ func_failure:
  * @brief Read data from serial connection and place in buffer
  * @return 0 on failure 1 on success
  */
-// https://www.msweet.org/serial/serial.html
+
+/* Message Format
+I'm not going to implement a CRC check at this time.
+Message Opening Marker
+    ++++ in ASCII
+
+Message Closing Marker
+    ---- in ASCII
+
+Between the opening and closing marker is a base64 encoded message
+1 byte message length in bytes including this length byte
+1 byte message type
+2 byte status bit field (message type 1)
+2 byte RPM (message type 1)
+
+Example Message:
+DEAD 0000 0100 0000 0001 0000 1100 1011 0010 CRC BEEF
+ */
 static int read_serial() {
     ssize_t bytes_read = read(serial_fd, buffer, sizeof(buffer));
     if (bytes_read < 0) {

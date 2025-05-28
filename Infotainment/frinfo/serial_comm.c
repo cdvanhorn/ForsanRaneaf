@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "../utilities/defines.h"
 
@@ -25,7 +26,7 @@ int serial_fd = 0;
  */
 static int open_serial(struct frinfo_config *cfg) {
     // Open the serial port
-    serial_fd = open(cfg->serial_path, O_RDWR | O_NOCTTY);
+    serial_fd = open(cfg->serial_path, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (serial_fd < 0) {
         log_write(LOG_TAG_ERR, "could not open serial port");
         return FUNC_FAILURE;
@@ -88,11 +89,12 @@ DEAD 0000 0100 0000 0001 0000 1100 1011 0010 CRC BEEF
  */
 static int read_serial() {
     ssize_t bytes_read = read(serial_fd, buffer, sizeof(buffer));
-    if (bytes_read < 0) {
+    if (bytes_read < 0 && errno != EAGAIN) {
         log_write(LOG_TAG_ERR, "could not read from serial port");
         return FUNC_FAILURE;
     }
-    printf("Received data: %.*s\n", (int)bytes_read, buffer);
+    if (bytes_read > 0)
+        printf("Received data: %.*s\n", (int)bytes_read, buffer);
     return FUNC_SUCCESS;
 }
 
@@ -114,11 +116,19 @@ void *serial_comm_loop(void *args) {
     if (rtv == FUNC_FAILURE)
         goto func_failure;
 
-    // TODO: check for data to be written to serial port
+    while (1) {
+        if (frinfo->shutdown) {
+            log_write(LOG_TAG_INFO, "serial communication received shutdown signal");
+            break;
+        }
 
-    rtv = read_serial();
-    if (rtv == FUNC_FAILURE)
-        goto func_failure;
+        rtv = read_serial();
+        if (rtv == FUNC_FAILURE)
+            frinfo->shutdown = true;
+
+    }
+
+    // TODO: check for data to be written to serial port
 
     /* algorithm:
      * initialize serial connection

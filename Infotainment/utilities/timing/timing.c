@@ -47,8 +47,13 @@ int timing_msleep(uint32_t ms)
 	return FUNC_SUCCESS;
 #elif __linux__
 	struct timespec ts;
-	ts.tv_nsec = ms * 1000000;
-	ts.tv_sec = 0;
+	if (ms < 1000) {
+		ts.tv_nsec = ms * 1000000;
+		ts.tv_sec = 0;
+	} else {
+		ts.tv_nsec = 0;
+		ts.tv_sec = ms / 1000;
+	}
 	return nanosleep(&ts, NULL);
 #endif
 }

@@ -1,21 +1,3 @@
-# Building Raylib w/o X11 on Ubuntu
-```shell
-sudo apt install build-essential git
-sudo apt install cmake
-sudo apt install libasound2-dev libgl1-mesa-dev libglu1-mesa-dev libgbm-dev libdrm-dev
-```
-
-If cmake is too old, get it from their repository, https://askubuntu.com/questions/355565/how-do-i-install-the-latest-version-of-cmake-from-the-command-line
-
-```shell
-git clone https://github.com/raysan5/raylib.git raylib
-cd raylib
-mkdir build && cd build
-cmake -DPLATFORM=DRM -DSUPPORT_FILEFORMAT_FLAC=ON ..
-make
-```
-Could not get it to work! :(
-
 # Building Raylib w/X11 on Ubuntu
 ```shell
 sudo apt install build-essential git
@@ -26,6 +8,7 @@ If cmake is too old, get it from their repository, https://askubuntu.com/questio
 
 ```shell
 git clone https://github.com/raysan5/raylib.git raylib
+git checkout tags/5.5
 cd raylib
 mkdir build && cd build
 cmake -DSUPPORT_FILEFORMAT_FLAC=ON ..
@@ -36,6 +19,7 @@ make
 ```shell
 sudo apt install libdrm-dev libegl1-mesa-dev libgles2-mesa-dev libgbm-dev
 git clone https://github.com/raysan5/raylib.git raylib
+git checkout tags/5.5
 cd raylib
 mkdir build && cd build
 cmake -DPLATFORM=DRM -DSUPPORT_FILEFORMAT_FLAC=ON ..

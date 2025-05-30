@@ -76,7 +76,7 @@ void output(int tag, const char *message)
  */
 void log_write(int tag, const char *message)
 {
-	if (log_profile != LOG_RELEASE || tag == LOG_TAG_ERR)
+	if (log_profile != ZT_LOG_RELEASE || tag == LOG_TAG_ERR)
 		output(tag, message);
 }
 

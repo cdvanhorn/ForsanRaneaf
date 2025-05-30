@@ -9,6 +9,11 @@
 #include "serial_comm.h"
 #include "ui.h"
 #include "../utilities/timing.h"
+#include "raylib.h"
+
+#define RAYGUI_IMPLEMENTATION
+
+#include "raygui.h"
 
 /**
  * @brief start the application with the given config

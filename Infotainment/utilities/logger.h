@@ -5,8 +5,8 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#define LOG_DEBUG 0
-#define LOG_RELEASE 1
+#define ZT_LOG_DEBUG 0
+#define ZT_LOG_RELEASE 1
 
 #define LOG_TAG_INFO 0
 #define LOG_TAG_WARN 1

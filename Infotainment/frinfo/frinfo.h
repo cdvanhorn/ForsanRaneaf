@@ -26,6 +26,7 @@ struct frinfo_config {
 struct frinfo {
     bool shutdown; //!< should the threads shutdown
     struct frinfo_config *config; //!< pointer to configuration
+    bool serial_connected; //!< did we make a serial connection with sensor network controller
 };
 
 extern int frinfo_start(struct frinfo_config *config);

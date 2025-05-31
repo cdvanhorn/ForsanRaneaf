@@ -113,8 +113,11 @@ void *serial_comm_loop(void *args) {
     }
 
     int rtv = open_serial(frinfo->config);
-    if (rtv == FUNC_FAILURE)
+    if (rtv == FUNC_FAILURE) {
+        frinfo->serial_connected = false;
         goto func_failure;
+    }
+    frinfo->serial_connected = true;
 
     while (1) {
         if (frinfo->shutdown) {

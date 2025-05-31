@@ -20,7 +20,11 @@ void ui_loop(const struct frinfo *frinfo) {
     {
         BeginDrawing();
         ClearBackground(RAYWHITE);
-        DrawText("Congrats! You created your first window!", 190, 200, 20, DARKGRAY);
+        if (frinfo->serial_connected) {
+            DrawText("Connected to sensor network controller!", 150, 80, 20, DARKGREEN);
+        } else {
+            DrawText("Failed to connect to sensor network controller!", 110, 80, 20, RED);
+        }
         EndDrawing();
     }
     CloseWindow();

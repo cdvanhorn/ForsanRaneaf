@@ -5,10 +5,6 @@ set(CMAKE_C_STANDARD 17)
 option(RPI "Building for RPI ARM64" OFF)
 option(LINUX_AMD64 "Building for Linux AMD64" OFF)
 
-if (RPI)
-	target_compile_definitions(frinfo RPI)
-endif ()
-
 include_directories(${CMAKE_SOURCE_DIR}/Infotainment/lib/raylib/include)
 include_directories(${CMAKE_SOURCE_DIR}/Infotainment/lib/raygui/include)
 
@@ -45,15 +41,24 @@ add_executable(frinfo
 )
 
 if (RPI)
+	target_compile_definitions(frinfo PRIVATE RPI)
 	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/Infotainment/lib/raylib/arm64)
+	target_link_libraries(frinfo
+			utilities
+			raylib
+			m
+			drm
+			GLESv2
+			gbm
+			EGL
+	)
 else ()
 	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/Infotainment/lib/raylib/amd64)
+	target_link_libraries(frinfo
+			utilities
+			raylib
+			m
+	)
 endif ()
-
-target_link_libraries(frinfo
-		utilities
-		raylib
-		m
-)
 
 configure_file(config.ini config.ini COPYONLY)

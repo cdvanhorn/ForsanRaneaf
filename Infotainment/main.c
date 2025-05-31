@@ -10,6 +10,8 @@ static void config_frinfo(struct frinfo_config *cfg) {
 #endif
 	inicfg_getint("serial", "baud", &(cfg->serial_baud_rate));
 	inicfg_getint("serial", "buffer_size", &(cfg->serial_buffer_size));
+	inicfg_getint("ui", "window_width", &(cfg->window_width));
+	inicfg_getint("ui", "window_height", &(cfg->window_height));
 }
 
 int main(int argc, char *argv[])

@@ -5,7 +5,9 @@
 #ifndef FRINFO_UI_H
 #define FRINFO_UI_H
 
-extern void *ui_loop(void *args);
+#include "frinfo.h"
+
+extern void ui_loop(const struct frinfo *frinfo);
 
 #endif
 

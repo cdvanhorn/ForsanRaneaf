@@ -8,12 +8,6 @@
 #include "../utilities/threading.h"
 #include "serial_comm.h"
 #include "ui.h"
-#include "../utilities/timing.h"
-#include "raylib.h"
-
-#define RAYGUI_IMPLEMENTATION
-
-#include "raygui.h"
 
 /**
  * @brief start the application with the given config
@@ -35,11 +29,11 @@ int frinfo_start(struct frinfo_config *config) {
 
     // start the user interface
     log_write(LOG_TAG_INFO, "starting user interface");
-    timing_msleep(5000);
+    ui_loop(&fi);
     fi.shutdown = true;
 
     pthread_join(comm_thread, NULL);
-    log_write(LOG_TAG_INFO, "finished communication thread");
+    log_write(LOG_TAG_INFO, "joined communication thread");
 
     return FUNC_SUCCESS;
 }

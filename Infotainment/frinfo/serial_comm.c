@@ -13,16 +13,26 @@
 #include <termios.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 
 #include "../utilities/defines.h"
 
-char *buffer = NULL;
-int serial_fd = 0;
+#define DELIM_LENGTH 4
+
+static struct frinfo *frinfo;
+
+static char *buffer = NULL;
+static int serial_fd = 0;
+
+static char *current_message = NULL;
+static int current_message_index = 0;
+static int plus_count = 0;
+static int minus_count = 0;
 
 /**
  * @brief Open serial port
  * @param cfg pointer to frinfo_config which will define the serial connection
- * @return 0 on failure 1 on success
+ * @return 1 on failure 0 on success
  */
 static int open_serial(struct frinfo_config *cfg) {
     // Open the serial port
@@ -66,9 +76,70 @@ func_failure:
 }
 
 /**
- * @brief Read data from serial connection and place in buffer
- * @return 0 on failure 1 on success
+ * @brief create a new message while parsing serial input
+ * @return 1 on failure 0 on success
  */
+static int new_message() {
+    if (current_message != NULL) {
+        log_write(LOG_TAG_WARN, "invalid serial message previous message didn't close");
+        free(current_message);
+        current_message = NULL;
+    }
+    current_message_index = 0;
+    current_message = (char *)malloc(frinfo->config->serial_buffer_size * sizeof(char));
+    if (current_message == NULL)
+        return FUNC_FAILURE;
+    return FUNC_SUCCESS;
+}
+
+/**
+ * @brief place message on incoming message buffer
+ * @return 1 on failure 0 on success
+ */
+static int close_message() {
+    if (current_message == NULL)
+        log_write(LOG_TAG_WARN, "invalid serial message closed before opened");
+    else {
+        frinfo->incoming_messages[frinfo->incoming_message_write_cursor] = current_message;
+        frinfo->incoming_message_write_cursor++;
+        if (frinfo->incoming_message_write_cursor == MAX_INCOMING_MESSAGES)
+            frinfo->incoming_message_write_cursor = 0;
+        current_message = NULL;
+    }
+    return FUNC_SUCCESS;
+}
+
+/**
+ * @brief parse serial input buffer placing complete messages on incoming message buffer
+ * @param bytes size_t number of bytes in buffer ready to be parsed
+ * @return 1 on failure 0 on success
+ */
+static int parse_buffer(const size_t bytes) {
+    for (int i = 0; i < bytes; i++) {
+        // printf("%c\n", buffer[i]);
+        if (buffer[i] == '+') {
+            plus_count++;
+            if (plus_count == DELIM_LENGTH) {
+                if (new_message() == FUNC_FAILURE)
+                    return FUNC_FAILURE;
+                plus_count = 0;
+            }
+        } else if (buffer[i] == '-') {
+            minus_count++;
+            if (minus_count == DELIM_LENGTH ) {
+                if (close_message() == FUNC_FAILURE)
+                    return FUNC_FAILURE;
+                minus_count = 0;
+            }
+        } else {
+            plus_count = 0;
+            minus_count = 0;
+            current_message[current_message_index] = buffer[i];
+            current_message_index++;
+        }
+    }
+    return FUNC_SUCCESS;
+}
 
 /* Message Format
 I'm not going to implement a CRC check at this time.
@@ -83,9 +154,11 @@ Between the opening and closing marker is a base64 encoded message
 1 byte message type
 2 byte status bit field (message type 1)
 2 byte RPM (message type 1)
+*/
 
-Example Message:
-DEAD 0000 0100 0000 0001 0000 1100 1011 0010 CRC BEEF
+/**
+ * @brief Read data from serial connection and place in buffer
+ * @return 1 on failure 0 on success
  */
 static int read_serial() {
     ssize_t bytes_read = read(serial_fd, buffer, sizeof(buffer));
@@ -93,8 +166,42 @@ static int read_serial() {
         log_write(LOG_TAG_ERR, "could not read from serial port");
         return FUNC_FAILURE;
     }
-    if (bytes_read > 0)
-        printf("Received data: %.*s\n", (int)bytes_read, buffer);
+    if (bytes_read > 0) {
+        if (parse_buffer(bytes_read) == FUNC_FAILURE) {
+            log_write(LOG_TAG_ERR, "could not parse serial message");
+            return FUNC_FAILURE;
+        }
+    }
+    return FUNC_SUCCESS;
+}
+
+/**
+ * @brief Clean up any allocated memory or resources used in this file
+ */
+static void cleanup() {
+    if (serial_fd >= 0)
+        close(serial_fd);
+    if (buffer != NULL) {
+        free(buffer);
+        buffer = NULL;
+    }
+    if (current_message != NULL) {
+        free(current_message);
+        current_message = NULL;
+    }
+}
+
+/**
+ * @brief check for messages to write on serial connection
+ * @return 1 on failure 0 on success
+ */
+static int write_serial() {
+    if (frinfo->outgoing_messages[frinfo->outgoing_message_read_cursor] != NULL) {
+        log_write(LOG_TAG_INFO, "writing message to serial connection");
+        frinfo->outgoing_message_read_cursor++;
+        if (frinfo->outgoing_message_read_cursor == MAX_OUTGOING_MESSAGES)
+            frinfo->outgoing_message_read_cursor = 0;
+    }
     return FUNC_SUCCESS;
 }
 
@@ -104,7 +211,7 @@ static int read_serial() {
  * @return void pointer to result of thread
  */
 void *serial_comm_loop(void *args) {
-    struct frinfo *frinfo = (struct frinfo *)args;
+    frinfo = (struct frinfo *)args;
 
     buffer = (char *)malloc(frinfo->config->serial_buffer_size * sizeof(char));
     if (buffer == NULL) {
@@ -125,43 +232,17 @@ void *serial_comm_loop(void *args) {
             break;
         }
 
-        rtv = read_serial();
-        if (rtv == FUNC_FAILURE)
-            frinfo->shutdown = true;
+        if (write_serial() == FUNC_FAILURE)
+            break;
 
+        if (read_serial() == FUNC_FAILURE)
+            break;
     }
 
-    // TODO: check for data to be written to serial port
-
-    /* algorithm:
-     * initialize serial connection
-     *
-     * loop:
-     * check if data to send out on serial connection
-     * if data to send lock send array
-     * send data on serial connection
-     * remove data form send array
-     * unlock send array
-     *
-     * check if data to read from serial connection
-     * if so read and parse data
-     * lock vehicle state
-     * update vehicle state
-     * unlock vehicle state
-     *
-     * close serial connection
-     */
-
-
-    if (serial_fd >= 0)
-        close(serial_fd);
-    free(buffer);
+    cleanup();
     return NULL;
 
 func_failure:
-    if (serial_fd >= 0)
-        close(serial_fd);
-    if (buffer != NULL)
-        free(buffer);
+    cleanup();
     return NULL;
 }

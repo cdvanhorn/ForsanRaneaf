@@ -40,8 +40,8 @@ https://www.sqlite.org/howtocompile.html
 
 ```shell
 git clone https://github.com/powturbo/Turbo-Base64
-git checkout tags/2023.08
 cd Turbo-Base64
+git checkout tags/2023.08
 mkdir build && cd build
 cmake ..
 make

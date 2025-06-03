@@ -122,6 +122,7 @@ void msg_queue_flush(struct msg_queue *q) {
     if (q->queue[q->read_cursor] == NULL) return;
     lock_msg_queue(q);
     free(q->queue[q->read_cursor]);
+    q->queue[q->read_cursor] = NULL;
     inc_read_cursor(q);
     unlock_msg_queue(q);
 }

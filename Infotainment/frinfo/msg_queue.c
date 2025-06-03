@@ -20,7 +20,7 @@ static void inc_read_cursor(struct msg_queue *q) {
 }
 
 /**
- * @breif increment the write cursor for this queue, if we've reached the limit go back to 0, queue should be locked before calling
+ * @brief increment the write cursor for this queue, if we've reached the limit go back to 0, queue should be locked before calling
  * @param q pointer to msg_queue struct
  */
 static void inc_write_cursor(struct msg_queue *q) {

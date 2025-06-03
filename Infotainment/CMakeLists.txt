@@ -39,6 +39,10 @@ add_executable(frinfo
         frinfo/serial_comm.c
         frinfo/ui.h
         frinfo/ui.c
+		frinfo/msg_handler.c
+		frinfo/msg_handler.h
+		frinfo/msg_queue.c
+		frinfo/msg_queue.h
 )
 
 if (RPI)

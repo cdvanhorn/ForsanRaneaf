@@ -7,7 +7,6 @@
 #include "frinfo.h"
 
 #include <fcntl.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <termios.h>
@@ -94,19 +93,14 @@ static int new_message() {
 
 /**
  * @brief place message on incoming message buffer
- * @return 1 on failure 0 on success
  */
-static int close_message() {
+static void close_message() {
     if (current_message == NULL)
         log_write(LOG_TAG_WARN, "invalid serial message closed before opened");
     else {
-        frinfo->incoming_messages[frinfo->incoming_message_write_cursor] = current_message;
-        frinfo->incoming_message_write_cursor++;
-        if (frinfo->incoming_message_write_cursor == MAX_INCOMING_MESSAGES)
-            frinfo->incoming_message_write_cursor = 0;
+        msg_queue_write(frinfo->incoming_msg_queue, current_message);
         current_message = NULL;
     }
-    return FUNC_SUCCESS;
 }
 
 /**
@@ -127,8 +121,7 @@ static int parse_buffer(const size_t bytes) {
         } else if (buffer[i] == '-') {
             minus_count++;
             if (minus_count == DELIM_LENGTH ) {
-                if (close_message() == FUNC_FAILURE)
-                    return FUNC_FAILURE;
+                close_message();
                 minus_count = 0;
             }
         } else {
@@ -161,7 +154,7 @@ Between the opening and closing marker is a base64 encoded message
  * @return 1 on failure 0 on success
  */
 static int read_serial() {
-    ssize_t bytes_read = read(serial_fd, buffer, sizeof(buffer));
+    const ssize_t bytes_read = read(serial_fd, buffer, sizeof(buffer));
     if (bytes_read < 0 && errno != EAGAIN) {
         log_write(LOG_TAG_ERR, "could not read from serial port");
         return FUNC_FAILURE;
@@ -196,11 +189,10 @@ static void cleanup() {
  * @return 1 on failure 0 on success
  */
 static int write_serial() {
-    if (frinfo->outgoing_messages[frinfo->outgoing_message_read_cursor] != NULL) {
+    const char *message = msg_queue_read(frinfo->outgoing_msg_queue);
+    if (message != NULL) {
         log_write(LOG_TAG_INFO, "writing message to serial connection");
-        frinfo->outgoing_message_read_cursor++;
-        if (frinfo->outgoing_message_read_cursor == MAX_OUTGOING_MESSAGES)
-            frinfo->outgoing_message_read_cursor = 0;
+        msg_queue_flush(frinfo->outgoing_msg_queue);
     }
     return FUNC_SUCCESS;
 }
@@ -210,6 +202,7 @@ static int write_serial() {
  * @param args void pointer arguments to serial communication thread
  * @return void pointer to result of thread
  */
+// ReSharper disable once CppDFAConstantFunctionResult
 void *serial_comm_loop(void *args) {
     frinfo = (struct frinfo *)args;
 

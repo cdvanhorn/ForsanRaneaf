@@ -16,23 +16,36 @@
  * @brief initialize given frinfo structure
  * @param fi pointer to struct frinfo that will be initialized
  * @param config pointer to struct frinfo_config config to save to frinfo struct
+ * @return 0 on success 1 on failure
  */
-static void frinfo_open(struct frinfo *fi, struct frinfo_config *config) {
+static int frinfo_open(struct frinfo *fi, struct frinfo_config *config) {
     fi->shutdown = false;
     fi->serial_connected = false;
     fi->config = config;
-    fi->incoming_message_write_cursor = 0;
-    fi->incoming_message_read_cursor = 0;
-    fi->outgoing_message_write_cursor = 0;
-    fi->outgoing_message_read_cursor = 0;
 
-    for (int i = 0; i < MAX_INCOMING_MESSAGES; i++) {
-        fi->incoming_messages[i] = NULL;
+    fi->incoming_msg_queue = NULL;
+    fi->incoming_msg_queue = (struct msg_queue *)malloc(sizeof(struct msg_queue));
+    if (fi->incoming_msg_queue == NULL) {
+        log_write(LOG_TAG_ERR, "couldn't allocate memory for incoming message queue");
+        return FUNC_FAILURE;
+    }
+    int rtv = msg_queue_open(fi->incoming_msg_queue);
+    if (rtv == FUNC_FAILURE)
+        return FUNC_FAILURE;
+
+    fi->outgoing_msg_queue = NULL;
+    fi->outgoing_msg_queue = (struct msg_queue *)malloc(sizeof(struct msg_queue));
+    if (fi->outgoing_msg_queue == NULL) {
+        log_write(LOG_TAG_ERR, "couldn't allocate memory for outgoing message queue");
+        return FUNC_FAILURE;
+    }
+    rtv = msg_queue_open(fi->outgoing_msg_queue);
+    if (rtv == FUNC_FAILURE) {
+        msg_queue_close(fi->incoming_msg_queue);
+        return FUNC_FAILURE;
     }
 
-    for (int i = 0; i < MAX_OUTGOING_MESSAGES; i++) {
-        fi->outgoing_messages[i] = NULL;
-    }
+    return FUNC_SUCCESS;
 }
 
 /**
@@ -40,17 +53,16 @@ static void frinfo_open(struct frinfo *fi, struct frinfo_config *config) {
  * @param fi pointer to struct frinfo
  */
 static void frinfo_close(struct frinfo *fi) {
-    for (int i = 0; i < MAX_INCOMING_MESSAGES; i++) {
-        if (fi->incoming_messages[i] != NULL) {
-            free(fi->incoming_messages[i]);
-            fi->incoming_messages[i] = NULL;
-        }
+    if (fi->incoming_msg_queue != NULL) {
+        msg_queue_close(fi->incoming_msg_queue);
+        free(fi->incoming_msg_queue);
+        fi->incoming_msg_queue = NULL;
     }
-    for (int i = 0; i < MAX_OUTGOING_MESSAGES; i++) {
-        if (fi->outgoing_messages[i] != NULL) {
-            free(fi->outgoing_messages[i]);
-            fi->outgoing_messages[i] = NULL;
-        }
+
+    if (fi->outgoing_msg_queue != NULL) {
+        msg_queue_close(fi->outgoing_msg_queue);
+        free(fi->outgoing_msg_queue);
+        fi->outgoing_msg_queue = NULL;
     }
 }
 

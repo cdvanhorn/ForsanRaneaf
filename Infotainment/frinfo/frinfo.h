@@ -33,9 +33,6 @@ struct frinfo {
     struct msg_queue *outgoing_msg_queue; //!< pointer to outgoing message queue
 };
 
-//TODO: add lock for incoming message parts of frinfo
-//TODO: add lock for outgoing message parts of frinfo
-
 extern int frinfo_start(struct frinfo_config *config);
 
 #endif //FRINFO_H

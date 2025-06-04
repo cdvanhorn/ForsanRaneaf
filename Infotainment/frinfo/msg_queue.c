@@ -100,6 +100,14 @@ void msg_queue_close(struct msg_queue *q) {
  */
 void msg_queue_write(struct msg_queue *q, char *msg) {
     lock_msg_queue(q);
+    if (q->queue[q->write_cursor] != NULL) {
+        log_write(LOG_TAG_WARN, "message queue filling faster than emptied");
+        free(q->queue[q->write_cursor]);
+        q->queue[q->write_cursor] = NULL;
+        if (q->write_cursor == q->read_cursor) {
+            inc_write_cursor(q);
+        }
+    }
     q->queue[q->write_cursor] = msg;
     inc_write_cursor(q);
     unlock_msg_queue(q);

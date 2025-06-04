@@ -105,7 +105,7 @@ void msg_queue_write(struct msg_queue *q, char *msg) {
         free(q->queue[q->write_cursor]);
         q->queue[q->write_cursor] = NULL;
         if (q->write_cursor == q->read_cursor) {
-            inc_write_cursor(q);
+            inc_read_cursor(q);
         }
     }
     q->queue[q->write_cursor] = msg;

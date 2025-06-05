@@ -20,7 +20,6 @@ struct msg_queue {
 extern int msg_queue_open(struct msg_queue *q);
 extern void msg_queue_close(struct msg_queue *q);
 extern void msg_queue_write(struct msg_queue *q, char *msg);
-extern char *msg_queue_read(const struct msg_queue *q);
-extern void msg_queue_flush(struct msg_queue *q);
+extern char *msg_queue_read(struct msg_queue *q);
 
 #endif //MSG_QUEUE_H

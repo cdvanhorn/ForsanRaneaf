@@ -7,7 +7,7 @@
 
 #include "frinfo.h"
 
-extern void ui_loop(const struct frinfo *frinfo);
+extern void ui_loop(struct frinfo *frinfo);
 
 #endif
 

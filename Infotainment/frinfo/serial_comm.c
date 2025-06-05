@@ -189,10 +189,10 @@ static void cleanup() {
  * @return 1 on failure 0 on success
  */
 static int write_serial() {
-    const char *message = msg_queue_read(frinfo->outgoing_msg_queue);
+    char *message = msg_queue_read(frinfo->outgoing_msg_queue);
     if (message != NULL) {
         log_write(LOG_TAG_INFO, "writing message to serial connection");
-        msg_queue_flush(frinfo->outgoing_msg_queue);
+        free(message);
     }
     return FUNC_SUCCESS;
 }

@@ -114,23 +114,17 @@ void msg_queue_write(struct msg_queue *q, char *msg) {
 }
 
 /**
- * @brief return message in queue at read cursor
+ * @brief return message in queue at read cursor, reader MUST free returned pointer
  * @param q pointer to msg_queue to read from
  * @return pointer to char message at read cursor
  */
-char * msg_queue_read(const struct msg_queue *q) {
-    return q->queue[q->read_cursor];
-}
-
-/**
- * @brief free message at read cursor and advance read cursor
- * @param q pointer to msg_queue
- */
-void msg_queue_flush(struct msg_queue *q) {
-    if (q->queue[q->read_cursor] == NULL) return;
+char * msg_queue_read(struct msg_queue *q) {
     lock_msg_queue(q);
-    free(q->queue[q->read_cursor]);
-    q->queue[q->read_cursor] = NULL;
-    inc_read_cursor(q);
+    char *msg =  q->queue[q->read_cursor];
+    if (msg != NULL) {
+        q->queue[q->read_cursor] = NULL;
+        inc_read_cursor(q);
+    }
     unlock_msg_queue(q);
+    return msg;
 }

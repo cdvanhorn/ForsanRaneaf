@@ -7,6 +7,6 @@
 
 #include "frinfo.h"
 
-extern void msg_handler_handle(struct frinfo *fi);
+extern void msg_handler_handle(const struct frinfo *fi);
 
 #endif //MSG_HANDLER_H

@@ -45,6 +45,15 @@ static int frinfo_open(struct frinfo *fi, struct frinfo_config *config) {
         return FUNC_FAILURE;
     }
 
+    fi->vehicle_status = NULL;
+    fi->vehicle_status = (struct vehicle_status *)malloc(sizeof(struct vehicle_status));
+    if (fi->vehicle_status == NULL) {
+        log_write(LOG_TAG_ERR, "couldn't allocate memory for vehicle status");
+        msg_queue_close(fi->outgoing_msg_queue);
+        msg_queue_close(fi->incoming_msg_queue);
+        return FUNC_FAILURE;
+    }
+
     return FUNC_SUCCESS;
 }
 
@@ -63,6 +72,11 @@ static void frinfo_close(struct frinfo *fi) {
         msg_queue_close(fi->outgoing_msg_queue);
         free(fi->outgoing_msg_queue);
         fi->outgoing_msg_queue = NULL;
+    }
+
+    if (fi->vehicle_status != NULL) {
+        free(fi->vehicle_status);
+        fi->vehicle_status = NULL;
     }
 }
 

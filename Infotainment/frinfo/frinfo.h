@@ -22,6 +22,15 @@ struct frinfo_config {
 };
 
 /**
+ * @struct vehicle_status
+ * @breif vehicle status container
+ */
+struct vehicle_status {
+    uint16_t flags; //!< vehicle status flags bit field
+    uint16_t rpm; //!< motor rotations per minute
+};
+
+/**
  * @struct frinfo
  * @brief top-level frinfo objects
  */
@@ -31,6 +40,7 @@ struct frinfo {
     bool serial_connected; //!< did we make a serial connection with sensor network controller
     struct msg_queue *incoming_msg_queue; //!< pointer to incoming message queue
     struct msg_queue *outgoing_msg_queue; //!< pointer to outgoing message queue
+    struct vehicle_status *vehicle_status; //!< pointer to vehicle status structure
 };
 
 extern int frinfo_start(struct frinfo_config *config);

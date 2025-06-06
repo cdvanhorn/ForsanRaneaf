@@ -8,8 +8,6 @@
 #define RAYGUI_IMPLEMENTATION
 #include "msg_handler.h"
 #include "raygui.h"
-#include "../utilities/defines.h"
-#include "../utilities/logger.h"
 
 /**
  * @brief main method of UI

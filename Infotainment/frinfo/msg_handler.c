@@ -60,7 +60,7 @@ static void process_msg(unsigned char *msg, const struct frinfo *fi) {
 }
 
 /**
- * @brief Go through messages in the incoming queue, validate them, then update vehicle status
+ * @brief Go through messages in the incoming queue, validate them, and process them
  * @param fi const pointer to frinfo structure
  */
 void msg_handler_handle(const struct frinfo *fi) {

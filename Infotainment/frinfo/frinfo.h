@@ -19,6 +19,7 @@ struct frinfo_config {
     int serial_buffer_size; //!< buffer size for serial port messages
     int window_width; //!< width of window in pixels
     int window_height; //!< height of window in pixels
+    int window_rotation; //!< ui rotation
 };
 
 /**

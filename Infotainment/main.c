@@ -5,13 +5,17 @@
 static void config_frinfo(struct frinfo_config *cfg) {
 #ifdef RPI
 	inicfg_getstring("serial", "pipath", &(cfg->serial_path));
+	inicfg_getint("ui", "pi_window_width", &(cfg->window_width));
+	inicfg_getint("ui", "pi_window_height", &(cfg->window_height));
+	inicfg_getint("ui", "pi_rotation", &(cfg->window_rotation));
 #else
 	inicfg_getstring("serial", "path", &(cfg->serial_path));
+	inicfg_getint("ui", "window_width", &(cfg->window_width));
+	inicfg_getint("ui", "window_height", &(cfg->window_height));
+	inicfg_getint("ui", "rotation", &(cfg->window_rotation));
 #endif
 	inicfg_getint("serial", "baud", &(cfg->serial_baud_rate));
 	inicfg_getint("serial", "buffer_size", &(cfg->serial_buffer_size));
-	inicfg_getint("ui", "window_width", &(cfg->window_width));
-	inicfg_getint("ui", "window_height", &(cfg->window_height));
 }
 
 int main(int argc, char *argv[])

@@ -56,10 +56,17 @@ void ui_loop(struct frinfo *frinfo) {
         //GuiButton((Rectangle){ 25, 665, 125, 30 }, GuiIconText(ICON_FILE_SAVE, "Save File"));
         //DrawRectangleLines( 10, 10, 630, 700, BLUE);
         DrawLine(1280/2, 10, 1280/2, 710, DARKGREEN);
-        GuiButton((Rectangle){ 25, 25, 125, 30 }, "Top Left");
-        GuiButton((Rectangle){ 25, 720 - 30 - 25, 125, 30 }, "Bottom Left");
-        GuiButton((Rectangle){ 1280 - 125 - 25, 25, 125, 30 }, "Top Right");
-        GuiButton((Rectangle){ 1280 - 125 - 25, 720 - 30 - 25, 125, 30 }, "Bottom Right");
+        if (use_camera) {
+            GuiButtonWorld(&camera, (Rectangle){ 25, 25, 125, 30 }, "Top Left");
+            GuiButtonWorld(&camera, (Rectangle){ 25, 720 - 30 - 25, 125, 30 }, "Bottom Left");
+            GuiButtonWorld(&camera, (Rectangle){ 1280 - 125 - 25, 25, 125, 30 }, "Top Right");
+            GuiButtonWorld(&camera, (Rectangle){ 1280 - 125 - 25, 720 - 30 - 25, 125, 30 }, "Bottom Right");
+        } else {
+            GuiButton((Rectangle){ 25, 25, 125, 30 }, "Top Left");
+            GuiButton((Rectangle){ 25, 720 - 30 - 25, 125, 30 }, "Bottom Left");
+            GuiButton((Rectangle){ 1280 - 125 - 25, 25, 125, 30 }, "Top Right");
+            GuiButton((Rectangle){ 1280 - 125 - 25, 720 - 30 - 25, 125, 30 }, "Bottom Right");
+        }
         if (use_camera)
             EndMode2D();
         EndDrawing();

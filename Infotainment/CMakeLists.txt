@@ -5,9 +5,9 @@ set(CMAKE_C_STANDARD 17)
 option(RPI "Building for RPI ARM64" OFF)
 option(LINUX_AMD64 "Building for Linux AMD64" OFF)
 
-include_directories(${CMAKE_SOURCE_DIR}/Infotainment/lib/raylib/include)
-include_directories(${CMAKE_SOURCE_DIR}/Infotainment/lib/raygui/include)
-include_directories(${CMAKE_SOURCE_DIR}/Infotainment/lib/Turbo-Base64/include)
+include_directories(${CMAKE_SOURCE_DIR}/lib/raylib/include)
+include_directories(${CMAKE_SOURCE_DIR}/lib/raygui/include)
+include_directories(${CMAKE_SOURCE_DIR}/lib/Turbo-Base64/include)
 
 add_library(utilities OBJECT
         utilities/mem_manager/mem_pool.h
@@ -47,8 +47,8 @@ add_executable(frinfo
 
 if (RPI)
 	target_compile_definitions(frinfo PRIVATE RPI)
-	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/Infotainment/lib/raylib/arm64)
-	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/Infotainment/lib/Turbo-Base64/arm64)
+	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/lib/raylib/arm64)
+	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/lib/Turbo-Base64/arm64)
 	target_link_libraries(frinfo
 			utilities
 			raylib
@@ -60,8 +60,8 @@ if (RPI)
 			base64
 	)
 else ()
-	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/Infotainment/lib/raylib/amd64)
-	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/Infotainment/lib/Turbo-Base64/amd64)
+	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/lib/raylib/amd64)
+	target_link_directories(frinfo PRIVATE ${CMAKE_SOURCE_DIR}/lib/Turbo-Base64/amd64)
 	target_link_libraries(frinfo
 			utilities
 			raylib

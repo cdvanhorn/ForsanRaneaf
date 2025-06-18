@@ -35,6 +35,12 @@
 #define ESP_NOW_EVENT_RECEIVE           0
 #define ESP_NOW_EVENT_SEND              1
 
+#define ESP_NOW_MSG_TYPE_REG            0
+#define ESP_NOW_MSG_TYPE_REG_ACK        1
+
+#define ESP_NOW_MSG_BROADCAST           0
+#define ESP_NOW_MSG_UNICAST             1
+
 static bool wifi_long_range = true;
 static uint8_t esp_now_mode = ESP_NOW_CLIENT_MODE;
 static uint8_t esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
@@ -61,6 +67,13 @@ union esp_now_event_data {
 struct esp_now_event {
     uint8_t event_id;
     union esp_now_event_data *data;
+};
+
+struct esp_now_message{
+    uint32_t flags; // 4 bit field (type, magic, broadcast/unicast)
+    uint16_t seq_num;
+    uint16_t crc;
+    uint8_t *payload;
 };
 
 /**
@@ -137,6 +150,16 @@ static void stop_esp_now() {
     }
 }
 
+static bool all_clients_checked_in() {
+    return true;
+}
+
+static int send_broadcast_register_message() {
+    //struct esp_now_message msg;
+    // return esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len);
+    return ESP_OK;
+}
+
 static int esp_now_controller_process() {
     // process each event on the queue
     // if send event check for failures and potentially resend messages
@@ -157,6 +180,10 @@ static int esp_now_controller_process() {
         // } else if (event->event_id == ESP_NOW_EVENT_RECEIVE) {
         //
         // }
+    }
+
+    if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG && !all_clients_checked_in()) {
+        return send_broadcast_register_message();
     }
 
     return ESP_OK;
@@ -226,6 +253,17 @@ void app_main(void)
     //        (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
     //
     // printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
+
+    uint32_t flags = ESP_NOW_MSG_BROADCAST; // 0000 0000 0000 0000 0000 0000 0000 0000
+    flags <<= 4; // 4 bits for type 0000 0000 0000 0000 0000 0000 0000 0000
+    flags = flags | ESP_NOW_MSG_TYPE_REG; // 0000 0000 0000 0000 0000 0000 0000 0000
+    flags <<= 8; // 8 bits for magic 0000 0000 0000 0000 0000 0000 0000 0000
+    printf("%lu\n", flags); // should be 0
+    uint8_t magic = 123; // 0111 1011
+    flags |= magic; // 0000 0000 0000 0000 0000 0000 0111 1011
+    printf("%lu\n", flags); // should be 123
+    flags <<= 19; // 0000 0011 1101 1000 0000 0000 0000 0000
+    printf("%lu\n", flags); // should be 64487424
 
     for (int i = 10; i >= 0; i--) {
         printf("Restarting in %d seconds...\n", i);

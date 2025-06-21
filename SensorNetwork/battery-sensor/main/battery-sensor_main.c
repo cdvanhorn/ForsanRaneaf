@@ -41,6 +41,8 @@
 #define ESP_NOW_MSG_BROADCAST           0
 #define ESP_NOW_MSG_UNICAST             1
 
+#define QUEUE_MAXDELAY 512
+
 static bool wifi_long_range = true;
 static uint8_t esp_now_mode = ESP_NOW_CONTROLLER_MODE;
 static uint8_t esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
@@ -59,17 +61,17 @@ struct esp_now_send_event{
 struct esp_now_receive_event {
     uint8_t mac_addr[ESP_NOW_ETH_ALEN];
     uint8_t *data;
-    int data_len;
+    uint16_t data_len;
 };
 
 union esp_now_event_data {
-    struct esp_now_send_event *send_event;
-    struct esp_now_receive_event *receive_event;
+    struct esp_now_send_event send_event;
+    struct esp_now_receive_event receive_event;
 };
 
 struct esp_now_event {
     uint8_t event_id;
-    union esp_now_event_data *data;
+    union esp_now_event_data data;
 };
 
 struct esp_now_msg_header{
@@ -111,8 +113,28 @@ static void receive_callback(const esp_now_recv_info_t *recv_info, const uint8_t
 
 }
 
-static void send_callback(const uint8_t *mac_addr, esp_now_send_status_t status) {
+static void send_callback(const uint8_t *mac_addr, const esp_now_send_status_t status) {
+    if (mac_addr == NULL) {
+        ESP_LOGE(TAG, "send call back argument error.");
+        return;
+    }
 
+    // MEMORY MUST BE FREED WHEN EVENT PROCESSED
+    struct esp_now_event *evt = malloc(sizeof(struct esp_now_event));
+    if (evt == NULL) {
+        ESP_LOGE(TAG, "No memory send_callback");
+        return;
+    }
+    evt->event_id = ESP_NOW_EVENT_SEND;
+    struct esp_now_send_event *send_event = &evt->data.send_event;
+    memcpy(send_event->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
+    send_event->status = status;
+
+    if (xQueueSend(esp_now_queue, evt, QUEUE_MAXDELAY) != pdTRUE) {
+        ESP_LOGW(TAG, "send callback queue send failed.");
+        free(evt);
+        evt = NULL;
+    }
 }
 
 /**
@@ -172,7 +194,6 @@ static int send_broadcast_register_message() {
     flags <<= 11; // left over bits
 
     const size_t buffer_size = sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN;
-    printf("register message size in bytes: %u\n", buffer_size);
     uint8_t *buffer = malloc(buffer_size);
     struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)buffer;
     hdr->flags = flags;
@@ -251,6 +272,8 @@ void app_main(void)
     ESP_LOGI(TAG, "ESP-NOW started!");
 
     esp_now_process();
+
+    //vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     stop_esp_now();
     ESP_LOGI(TAG, "ESP_NOW stopped!");

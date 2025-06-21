@@ -72,8 +72,8 @@ struct esp_now_event {
     union esp_now_event_data *data;
 };
 
-struct esp_now_header{
-    uint32_t flags; // 4 bit field (type, magic, broadcast/unicast)
+struct esp_now_msg_header{
+    uint32_t flags; // bit field (type, magic, broadcast/unicast, msg length)
     uint16_t seq_num;
     uint16_t crc;
 };
@@ -159,20 +159,26 @@ static bool all_clients_checked_in() {
 }
 
 static int send_broadcast_register_message() {
+    // |0                |0000        |00000000 |00000000      |00000000000|
+    // |broadcast/unicast|message type|magic    |message length|unused     |
+    // example flags - 0 0000 10000100 00000110 00000000000 - 69218304
     uint32_t flags = ESP_NOW_MSG_BROADCAST;
-    flags <<= 4;
+    flags <<= 4; // width of message type 4 bits
     flags = flags | ESP_NOW_MSG_TYPE_REG;
-    flags <<= 8;
+    flags <<= 8; // width of magic number 8 bits
     flags |= magic;
-    flags <<= 19;
+    flags <<= 8; // width of message length
+    flags |= ESP_NOW_ETH_ALEN;
+    flags <<= 11; // left over bits
 
-    const size_t buffer_size = sizeof(struct esp_now_header) + ESP_NOW_ETH_ALEN;
+    const size_t buffer_size = sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN;
+    printf("register message size in bytes: %u\n", buffer_size);
     uint8_t *buffer = malloc(buffer_size);
-    struct esp_now_header *hdr = (struct esp_now_header *)buffer;
+    struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)buffer;
     hdr->flags = flags;
     hdr->seq_num = seq++;
     hdr->crc = 0;
-    memcpy(buffer + sizeof(struct esp_now_header), wifi_mac, ESP_NOW_ETH_ALEN);
+    memcpy(buffer + sizeof(struct esp_now_msg_header), wifi_mac, ESP_NOW_ETH_ALEN);
     hdr->crc = esp_crc16_le(UINT16_MAX, buffer, buffer_size);
     const esp_err_t result = esp_now_send(broadcast_mac, buffer, buffer_size);
     ESP_LOGI(TAG, "Broadcast register message sent: %d", result);

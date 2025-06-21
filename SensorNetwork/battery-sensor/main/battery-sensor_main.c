@@ -10,11 +10,11 @@
 #include "freertos/task.h"
 #include "esp_chip_info.h"
 #include "esp_event.h"
-#include "esp_flash.h"
 #include "esp_system.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "nvs_flash.h"
+#include "esp_crc.h"
 
 // TODO: Make a config variable
 #define WIFI_PRIMARY_CHANNEL            10
@@ -42,11 +42,14 @@
 #define ESP_NOW_MSG_UNICAST             1
 
 static bool wifi_long_range = true;
-static uint8_t esp_now_mode = ESP_NOW_CLIENT_MODE;
+static uint8_t esp_now_mode = ESP_NOW_CONTROLLER_MODE;
 static uint8_t esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
 static const char *TAG = "battery_sensor";
 static uint8_t broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 static QueueHandle_t esp_now_queue = NULL;
+static uint16_t seq = 0;
+static uint8_t magic = 132;
+static uint8_t wifi_mac[ESP_NOW_ETH_ALEN];
 
 struct esp_now_send_event{
     uint8_t mac_addr[ESP_NOW_ETH_ALEN];
@@ -69,11 +72,10 @@ struct esp_now_event {
     union esp_now_event_data *data;
 };
 
-struct esp_now_message{
+struct esp_now_header{
     uint32_t flags; // 4 bit field (type, magic, broadcast/unicast)
     uint16_t seq_num;
     uint16_t crc;
-    uint8_t *payload;
 };
 
 /**
@@ -93,6 +95,8 @@ static void start_wifi() {
         ESP_ERROR_CHECK( esp_wifi_set_protocol(ESP_IF_WIFI_STA,
             WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N|WIFI_PROTOCOL_LR) );
     }
+
+    ESP_ERROR_CHECK( esp_wifi_get_mac(WIFI_MODE_STA, wifi_mac) );
 }
 
 /**
@@ -151,13 +155,29 @@ static void stop_esp_now() {
 }
 
 static bool all_clients_checked_in() {
-    return true;
+    return false;
 }
 
 static int send_broadcast_register_message() {
-    //struct esp_now_message msg;
-    // return esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len);
-    return ESP_OK;
+    uint32_t flags = ESP_NOW_MSG_BROADCAST;
+    flags <<= 4;
+    flags = flags | ESP_NOW_MSG_TYPE_REG;
+    flags <<= 8;
+    flags |= magic;
+    flags <<= 19;
+
+    const size_t buffer_size = sizeof(struct esp_now_header) + ESP_NOW_ETH_ALEN;
+    uint8_t *buffer = malloc(buffer_size);
+    struct esp_now_header *hdr = (struct esp_now_header *)buffer;
+    hdr->flags = flags;
+    hdr->seq_num = seq++;
+    hdr->crc = 0;
+    memcpy(buffer + sizeof(struct esp_now_header), wifi_mac, ESP_NOW_ETH_ALEN);
+    hdr->crc = esp_crc16_le(UINT16_MAX, buffer, buffer_size);
+    const esp_err_t result = esp_now_send(broadcast_mac, buffer, buffer_size);
+    ESP_LOGI(TAG, "Broadcast register message sent: %d", result);
+    free(buffer);
+    return result;
 }
 
 static int esp_now_controller_process() {
@@ -173,14 +193,14 @@ static int esp_now_controller_process() {
         // send broadcast register message
     // if all have checked in change mode to ready
 
-    struct esp_now_event *event;
-    while (xQueueReceive(esp_now_queue, &event, 0) == pdTRUE) {
-        // if (event->event_id == ESP_NOW_EVENT_SEND) {
-        //
-        // } else if (event->event_id == ESP_NOW_EVENT_RECEIVE) {
-        //
-        // }
-    }
+    // struct esp_now_event *event;
+    // while (xQueueReceive(esp_now_queue, &event, 0) == pdTRUE) {
+    //     // if (event->event_id == ESP_NOW_EVENT_SEND) {
+    //     //
+    //     // } else if (event->event_id == ESP_NOW_EVENT_RECEIVE) {
+    //     //
+    //     // }
+    // }
 
     if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG && !all_clients_checked_in()) {
         return send_broadcast_register_message();
@@ -205,6 +225,7 @@ static int esp_now_process() {
         return esp_now_client_process();
     if (esp_now_mode == ESP_NOW_CONTROLLER_MODE)
         return esp_now_controller_process();
+    return ESP_OK;
 }
 
 void app_main(void)
@@ -222,6 +243,8 @@ void app_main(void)
 
     start_esp_now();
     ESP_LOGI(TAG, "ESP-NOW started!");
+
+    esp_now_process();
 
     stop_esp_now();
     ESP_LOGI(TAG, "ESP_NOW stopped!");
@@ -254,16 +277,16 @@ void app_main(void)
     //
     // printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
 
-    uint32_t flags = ESP_NOW_MSG_BROADCAST; // 0000 0000 0000 0000 0000 0000 0000 0000
-    flags <<= 4; // 4 bits for type 0000 0000 0000 0000 0000 0000 0000 0000
-    flags = flags | ESP_NOW_MSG_TYPE_REG; // 0000 0000 0000 0000 0000 0000 0000 0000
-    flags <<= 8; // 8 bits for magic 0000 0000 0000 0000 0000 0000 0000 0000
-    printf("%lu\n", flags); // should be 0
-    uint8_t magic = 123; // 0111 1011
-    flags |= magic; // 0000 0000 0000 0000 0000 0000 0111 1011
-    printf("%lu\n", flags); // should be 123
-    flags <<= 19; // 0000 0011 1101 1000 0000 0000 0000 0000
-    printf("%lu\n", flags); // should be 64487424
+    // uint32_t flags = ESP_NOW_MSG_BROADCAST; // 0000 0000 0000 0000 0000 0000 0000 0000
+    // flags <<= 4; // 4 bits for type 0000 0000 0000 0000 0000 0000 0000 0000
+    // flags = flags | ESP_NOW_MSG_TYPE_REG; // 0000 0000 0000 0000 0000 0000 0000 0000
+    // flags <<= 8; // 8 bits for magic 0000 0000 0000 0000 0000 0000 0000 0000
+    // printf("%lu\n", flags); // should be 0
+    // uint8_t magic = 123; // 0111 1011
+    // flags |= magic; // 0000 0000 0000 0000 0000 0000 0111 1011
+    // printf("%lu\n", flags); // should be 123
+    // flags <<= 19; // 0000 0011 1101 1000 0000 0000 0000 0000
+    // printf("%lu\n", flags); // should be 64487424
 
     for (int i = 10; i >= 0; i--) {
         printf("Restarting in %d seconds...\n", i);

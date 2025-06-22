@@ -24,6 +24,7 @@
 #define ESP_NOW_COOLANT_CLIENT          0
 #define ESP_NOW_VCU_CLIENT              1
 #define ESP_NOW_BATTERY_CLIENT          2
+#define ESP_NOW_NUM_CLIENTS             3
 
 #define ESP_NOW_QUEUE_SIZE              10
 
@@ -51,6 +52,9 @@ static QueueHandle_t esp_now_queue = NULL;
 static uint16_t seq = 0;
 static uint8_t magic = 132;
 static uint8_t wifi_mac[ESP_NOW_ETH_ALEN];
+
+// client states
+static uint8_t client_states[ESP_NOW_NUM_CLIENTS];
 
 struct esp_now_send_event{
     uint8_t mac_addr[ESP_NOW_ETH_ALEN];
@@ -169,7 +173,14 @@ static void stop_esp_now() {
 }
 
 static bool all_clients_checked_in() {
-    return false;
+    bool all_checked_in = true;
+    for (uint8_t i = 0; i < ESP_NOW_NUM_CLIENTS; i++) {
+        if (client_states[i] != ESP_NOW_CONN_STATE_READY) {
+            all_checked_in = false;
+            break;
+        }
+    }
+    return all_checked_in;
 }
 
 static int send_broadcast_register_message(const uint8_t *msg_buffer) {
@@ -222,8 +233,11 @@ static int esp_now_controller_process(const uint8_t *msg_buffer) {
         }
     }
 
-    if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG && !all_clients_checked_in()) {
-        return send_broadcast_register_message(msg_buffer);
+    if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG) {
+        if (all_clients_checked_in())
+            esp_now_conn_state = ESP_NOW_CONN_STATE_READY;
+        else
+            return send_broadcast_register_message(msg_buffer);
     }
 
     return ESP_OK;
@@ -240,12 +254,16 @@ static int esp_now_client_process() {
     return ESP_OK;
 }
 
-static void battery_sensor_network_task(void *pvParameter) {
+static void sensor_network_task(void *pvParameter) {
     start_wifi();
     ESP_LOGI(TAG, "WIFI interface started in station mode at 2.4G!");
 
     start_esp_now();
     ESP_LOGI(TAG, "ESP-NOW started!");
+
+    for (uint8_t i = 0; i < ESP_NOW_NUM_CLIENTS; i++) {
+        client_states[i] = ESP_NOW_CONN_STATE_REG;
+    }
 
     uint8_t *msg_buffer = malloc(sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
     if (msg_buffer == NULL) {
@@ -295,53 +313,11 @@ void app_main(void)
     ESP_ERROR_CHECK( ret );
 
     // TODO: Setup queue to communicate between tasks, the can task will need to send messages on the esp-now network
+    // the esp-now task will need to tell can task to shutdown
+    // can task will need to tell esp-now task to shutdown
 
     TaskHandle_t taskHandle = NULL;
-    xTaskCreate(battery_sensor_network_task, "batt_esp_now_tsk", 8192, NULL, 4, &taskHandle);
+    xTaskCreate(sensor_network_task, "esp_now_task", 8192, NULL, 4, &taskHandle);
 
     // TODO: infinite loop to monitor tasks
-
-    /* Print chip information */
-    // esp_chip_info_t chip_info;
-    // uint32_t flash_size;
-    // esp_chip_info(&chip_info);
-    // printf("This is %s chip with %d CPU core(s), %s%s%s%s, ",
-    //        CONFIG_IDF_TARGET,
-    //        chip_info.cores,
-    //        (chip_info.features & CHIP_FEATURE_WIFI_BGN) ? "WiFi/" : "",
-    //        (chip_info.features & CHIP_FEATURE_BT) ? "BT" : "",
-    //        (chip_info.features & CHIP_FEATURE_BLE) ? "BLE" : "",
-    //        (chip_info.features & CHIP_FEATURE_IEEE802154) ? ", 802.15.4 (Zigbee/Thread)" : "");
-    //
-    // unsigned major_rev = chip_info.revision / 100;
-    // unsigned minor_rev = chip_info.revision % 100;
-    // printf("silicon revision v%d.%d, ", major_rev, minor_rev);
-    // if(esp_flash_get_size(NULL, &flash_size) != ESP_OK) {
-    //     printf("Get flash size failed");
-    //     return;
-    // }
-    //
-    // printf("%" PRIu32 "MB %s flash\n", flash_size / (uint32_t)(1024 * 1024),
-    //        (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
-    //
-    // printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
-
-    // uint32_t flags = ESP_NOW_MSG_BROADCAST; // 0000 0000 0000 0000 0000 0000 0000 0000
-    // flags <<= 4; // 4 bits for type 0000 0000 0000 0000 0000 0000 0000 0000
-    // flags = flags | ESP_NOW_MSG_TYPE_REG; // 0000 0000 0000 0000 0000 0000 0000 0000
-    // flags <<= 8; // 8 bits for magic 0000 0000 0000 0000 0000 0000 0000 0000
-    // printf("%lu\n", flags); // should be 0
-    // uint8_t magic = 123; // 0111 1011
-    // flags |= magic; // 0000 0000 0000 0000 0000 0000 0111 1011
-    // printf("%lu\n", flags); // should be 123
-    // flags <<= 19; // 0000 0011 1101 1000 0000 0000 0000 0000
-    // printf("%lu\n", flags); // should be 64487424
-
-    // for (int i = 5; i >= 0; i--) {
-    //     printf("Restarting in %d seconds...\n", i);
-    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    // }
-    // printf("Restarting now.\n");
-    // fflush(stdout);
-    // esp_restart();
 }

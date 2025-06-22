@@ -119,21 +119,14 @@ static void send_callback(const uint8_t *mac_addr, const esp_now_send_status_t s
         return;
     }
 
-    // MEMORY MUST BE FREED WHEN EVENT PROCESSED
-    struct esp_now_event *evt = malloc(sizeof(struct esp_now_event));
-    if (evt == NULL) {
-        ESP_LOGE(TAG, "No memory send_callback");
-        return;
-    }
-    evt->event_id = ESP_NOW_EVENT_SEND;
-    struct esp_now_send_event *send_event = &evt->data.send_event;
-    memcpy(send_event->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
+    struct esp_now_event event;
+    event.event_id = ESP_NOW_EVENT_SEND;
+    struct esp_now_send_event *send_event = &event.data.send_event;
     send_event->status = status;
+    memcpy(send_event->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
 
-    if (xQueueSend(esp_now_queue, evt, QUEUE_MAXDELAY) != pdTRUE) {
+    if (xQueueSend(esp_now_queue, &event, QUEUE_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "send callback queue send failed.");
-        free(evt);
-        evt = NULL;
     }
 }
 
@@ -141,7 +134,7 @@ static void send_callback(const uint8_t *mac_addr, const esp_now_send_status_t s
  * @brief start esp_now service and any accompanying objects
  */
 static int start_esp_now() {
-    esp_now_queue = xQueueCreate(ESP_NOW_QUEUE_SIZE, sizeof(struct esp_now_event *));
+    esp_now_queue = xQueueCreate(ESP_NOW_QUEUE_SIZE, sizeof(struct esp_now_event));
     if (esp_now_queue == NULL) {
         ESP_LOGE(TAG, "Create queue fail");
         return ESP_FAIL;
@@ -180,7 +173,7 @@ static bool all_clients_checked_in() {
     return false;
 }
 
-static int send_broadcast_register_message() {
+static int send_broadcast_register_message(const uint8_t *msg_buffer) {
     // |0                |0000        |00000000 |00000000      |00000000000|
     // |broadcast/unicast|message type|magic    |message length|unused     |
     // example flags - 0 0000 10000100 00000110 00000000000 - 69218304
@@ -193,21 +186,33 @@ static int send_broadcast_register_message() {
     flags |= ESP_NOW_ETH_ALEN;
     flags <<= 11; // left over bits
 
-    const size_t buffer_size = sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN;
-    uint8_t *buffer = malloc(buffer_size);
-    struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)buffer;
+    // const size_t buffer_size = sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN;
+    // uint8_t *buffer = malloc(buffer_size);
+    // struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)buffer;
+    // hdr->flags = flags;
+    // hdr->seq_num = seq++;
+    // hdr->crc = 0;
+    // memcpy(buffer + sizeof(struct esp_now_msg_header), wifi_mac, ESP_NOW_ETH_ALEN);
+    // hdr->crc = esp_crc16_le(UINT16_MAX, buffer, buffer_size);
+    // const esp_err_t result = esp_now_send(broadcast_mac, buffer, buffer_size);
+    // ESP_LOGI(TAG, "Broadcast register message sent: %d", result);
+    // free(buffer);
+    // return result;
+
+    ESP_LOGI(TAG, "Broadcast register message start");
+    const size_t full_msg_size = sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN;
+    struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)msg_buffer;
     hdr->flags = flags;
     hdr->seq_num = seq++;
     hdr->crc = 0;
-    memcpy(buffer + sizeof(struct esp_now_msg_header), wifi_mac, ESP_NOW_ETH_ALEN);
-    hdr->crc = esp_crc16_le(UINT16_MAX, buffer, buffer_size);
-    const esp_err_t result = esp_now_send(broadcast_mac, buffer, buffer_size);
+    memcpy((void *)(sizeof(struct esp_now_msg_header) + msg_buffer), wifi_mac, ESP_NOW_ETH_ALEN);
+    hdr->crc = esp_crc16_le(UINT16_MAX, msg_buffer, full_msg_size);
+    const esp_err_t result = esp_now_send(broadcast_mac, msg_buffer, full_msg_size);
     ESP_LOGI(TAG, "Broadcast register message sent: %d", result);
-    free(buffer);
     return result;
 }
 
-static int esp_now_controller_process() {
+static int esp_now_controller_process(const uint8_t *msg_buffer) {
     // process each event on the queue
     // if send event check for failures and potentially resend messages
         // if register_ack and success mark client as registered
@@ -220,17 +225,20 @@ static int esp_now_controller_process() {
         // send broadcast register message
     // if all have checked in change mode to ready
 
-    // struct esp_now_event *event;
-    // while (xQueueReceive(esp_now_queue, &event, 0) == pdTRUE) {
-    //     // if (event->event_id == ESP_NOW_EVENT_SEND) {
-    //     //
-    //     // } else if (event->event_id == ESP_NOW_EVENT_RECEIVE) {
-    //     //
-    //     // }
-    // }
+    struct esp_now_event event;
+    while (xQueueReceive(esp_now_queue, &event, 0) == pdTRUE) {
+        ESP_LOGI(TAG, "Received event: %d", event.event_id);
+        if (event.event_id == ESP_NOW_EVENT_SEND) {
+            if (event.data.send_event.status == ESP_NOW_SEND_SUCCESS) {
+                ESP_LOGI(TAG, "broadcast message sent successfully!");
+            }
+        } else if (event.event_id == ESP_NOW_EVENT_RECEIVE) {
+
+        }
+    }
 
     if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG && !all_clients_checked_in()) {
-        return send_broadcast_register_message();
+        return send_broadcast_register_message(msg_buffer);
     }
 
     return ESP_OK;
@@ -247,12 +255,36 @@ static int esp_now_client_process() {
     return ESP_OK;
 }
 
-static int esp_now_process() {
+static int esp_now_process(const uint8_t *msg_buffer) {
     if (esp_now_mode == ESP_NOW_CLIENT_MODE)
         return esp_now_client_process();
     if (esp_now_mode == ESP_NOW_CONTROLLER_MODE)
-        return esp_now_controller_process();
+        return esp_now_controller_process(msg_buffer);
     return ESP_OK;
+}
+
+static void battery_sensor_task(void *pvParameter) {
+    // read battery status from can network twi
+    // process esp now network messages
+
+    const uint8_t *msg_buffer = (uint8_t *)pvParameter;
+    // get current ticks for timing
+    TickType_t current_tick_time = xTaskGetTickCount();
+    const TickType_t target_tick_time = current_tick_time + pdMS_TO_TICKS(20000);
+
+    while (1) {
+        // for now run for 20 seconds
+        esp_now_process(msg_buffer);
+
+        // run about 4 times a second
+        vTaskDelay(250 / portTICK_PERIOD_MS);
+
+        current_tick_time = xTaskGetTickCount();
+        if (current_tick_time > target_tick_time) {
+            ESP_LOGI(TAG, "battery sensor task finished");
+            break;
+        }
+    }
 }
 
 void app_main(void)
@@ -271,9 +303,23 @@ void app_main(void)
     start_esp_now();
     ESP_LOGI(TAG, "ESP-NOW started!");
 
-    esp_now_process();
+    uint8_t *msg_buffer = malloc(sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
+    if (msg_buffer == NULL) {
+        ESP_LOGE(TAG, "message buffer allocation failed!");
+        fflush(stdout);
+        esp_restart();
+    }
+    memset(msg_buffer, 0, sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
 
-    //vTaskDelay(1000 / portTICK_PERIOD_MS);
+    TaskHandle_t taskHandle = NULL;
+    xTaskCreate(battery_sensor_task, "bsensor_task", 8192, msg_buffer, 4, &taskHandle);
+
+    vTaskDelay(21000 / portTICK_PERIOD_MS);
+
+    if (taskHandle != NULL)
+        vTaskDelete(taskHandle);
+
+    free(msg_buffer);
 
     stop_esp_now();
     ESP_LOGI(TAG, "ESP_NOW stopped!");
@@ -317,7 +363,7 @@ void app_main(void)
     // flags <<= 19; // 0000 0011 1101 1000 0000 0000 0000 0000
     // printf("%lu\n", flags); // should be 64487424
 
-    for (int i = 10; i >= 0; i--) {
+    for (int i = 5; i >= 0; i--) {
         printf("Restarting in %d seconds...\n", i);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }

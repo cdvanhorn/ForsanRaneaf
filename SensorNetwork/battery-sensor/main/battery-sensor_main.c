@@ -10,7 +10,6 @@
 #include "freertos/task.h"
 #include "esp_chip_info.h"
 #include "esp_event.h"
-#include "esp_system.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "nvs_flash.h"
@@ -186,20 +185,6 @@ static int send_broadcast_register_message(const uint8_t *msg_buffer) {
     flags |= ESP_NOW_ETH_ALEN;
     flags <<= 11; // left over bits
 
-    // const size_t buffer_size = sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN;
-    // uint8_t *buffer = malloc(buffer_size);
-    // struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)buffer;
-    // hdr->flags = flags;
-    // hdr->seq_num = seq++;
-    // hdr->crc = 0;
-    // memcpy(buffer + sizeof(struct esp_now_msg_header), wifi_mac, ESP_NOW_ETH_ALEN);
-    // hdr->crc = esp_crc16_le(UINT16_MAX, buffer, buffer_size);
-    // const esp_err_t result = esp_now_send(broadcast_mac, buffer, buffer_size);
-    // ESP_LOGI(TAG, "Broadcast register message sent: %d", result);
-    // free(buffer);
-    // return result;
-
-    ESP_LOGI(TAG, "Broadcast register message start");
     const size_t full_msg_size = sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN;
     struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)msg_buffer;
     hdr->flags = flags;
@@ -255,36 +240,48 @@ static int esp_now_client_process() {
     return ESP_OK;
 }
 
-static int esp_now_process(const uint8_t *msg_buffer) {
-    if (esp_now_mode == ESP_NOW_CLIENT_MODE)
-        return esp_now_client_process();
-    if (esp_now_mode == ESP_NOW_CONTROLLER_MODE)
-        return esp_now_controller_process(msg_buffer);
-    return ESP_OK;
-}
+static void battery_sensor_network_task(void *pvParameter) {
+    start_wifi();
+    ESP_LOGI(TAG, "WIFI interface started in station mode at 2.4G!");
 
-static void battery_sensor_task(void *pvParameter) {
-    // read battery status from can network twi
-    // process esp now network messages
+    start_esp_now();
+    ESP_LOGI(TAG, "ESP-NOW started!");
 
-    const uint8_t *msg_buffer = (uint8_t *)pvParameter;
-    // get current ticks for timing
-    TickType_t current_tick_time = xTaskGetTickCount();
-    const TickType_t target_tick_time = current_tick_time + pdMS_TO_TICKS(20000);
+    uint8_t *msg_buffer = malloc(sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
+    if (msg_buffer == NULL) {
+        ESP_LOGE(TAG, "message buffer allocation failed!");
+        goto graceful_exit;
+    }
+    memset(msg_buffer, 0, sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
 
+    int result = ESP_OK;
+
+    // ReSharper disable once CppDFAEndlessLoop
     while (1) {
-        // for now run for 20 seconds
-        esp_now_process(msg_buffer);
+        // TODO: Check if someone says we should shutdown
+
+        if (esp_now_mode == ESP_NOW_CLIENT_MODE)
+            result = esp_now_client_process();
+        if (esp_now_mode == ESP_NOW_CONTROLLER_MODE)
+            result = esp_now_controller_process(msg_buffer);
+
+        if (result != ESP_OK) { // catastrophic failure try restart?
+            break;
+        }
 
         // run about 4 times a second
         vTaskDelay(250 / portTICK_PERIOD_MS);
-
-        current_tick_time = xTaskGetTickCount();
-        if (current_tick_time > target_tick_time) {
-            ESP_LOGI(TAG, "battery sensor task finished");
-            break;
-        }
     }
+
+graceful_exit:
+    // cleanup
+    free(msg_buffer);
+    stop_esp_now();
+    ESP_LOGI(TAG, "ESP_NOW stopped!");
+    stop_wifi();
+    ESP_LOGI(TAG, "WIFI interface stopped!");
+    // adios
+    vTaskDelete(NULL);
 }
 
 void app_main(void)
@@ -297,35 +294,12 @@ void app_main(void)
     }
     ESP_ERROR_CHECK( ret );
 
-    start_wifi();
-    ESP_LOGI(TAG, "WIFI interface started in station mode at 2.4G!");
-
-    start_esp_now();
-    ESP_LOGI(TAG, "ESP-NOW started!");
-
-    uint8_t *msg_buffer = malloc(sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
-    if (msg_buffer == NULL) {
-        ESP_LOGE(TAG, "message buffer allocation failed!");
-        fflush(stdout);
-        esp_restart();
-    }
-    memset(msg_buffer, 0, sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
+    // TODO: Setup queue to communicate between tasks, the can task will need to send messages on the esp-now network
 
     TaskHandle_t taskHandle = NULL;
-    xTaskCreate(battery_sensor_task, "bsensor_task", 8192, msg_buffer, 4, &taskHandle);
+    xTaskCreate(battery_sensor_network_task, "batt_esp_now_tsk", 8192, NULL, 4, &taskHandle);
 
-    vTaskDelay(21000 / portTICK_PERIOD_MS);
-
-    if (taskHandle != NULL)
-        vTaskDelete(taskHandle);
-
-    free(msg_buffer);
-
-    stop_esp_now();
-    ESP_LOGI(TAG, "ESP_NOW stopped!");
-
-    stop_wifi();
-    ESP_LOGI(TAG, "WIFI interface stopped!");
+    // TODO: infinite loop to monitor tasks
 
     /* Print chip information */
     // esp_chip_info_t chip_info;
@@ -363,11 +337,11 @@ void app_main(void)
     // flags <<= 19; // 0000 0011 1101 1000 0000 0000 0000 0000
     // printf("%lu\n", flags); // should be 64487424
 
-    for (int i = 5; i >= 0; i--) {
-        printf("Restarting in %d seconds...\n", i);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-    printf("Restarting now.\n");
-    fflush(stdout);
-    esp_restart();
+    // for (int i = 5; i >= 0; i--) {
+    //     printf("Restarting in %d seconds...\n", i);
+    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
+    // }
+    // printf("Restarting now.\n");
+    // fflush(stdout);
+    // esp_restart();
 }

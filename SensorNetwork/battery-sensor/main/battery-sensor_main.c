@@ -41,10 +41,10 @@
 #define ESP_NOW_MSG_BROADCAST           0
 #define ESP_NOW_MSG_UNICAST             1
 
-#define QUEUE_MAXDELAY 512
+#define QUEUE_MAX_DELAY                 512
 
 static bool wifi_long_range = true;
-static uint8_t esp_now_mode = ESP_NOW_CONTROLLER_MODE;
+static uint8_t esp_now_mode = ESP_NOW_CLIENT_MODE;
 static uint8_t esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
 static const char *TAG = "battery_sensor";
 static uint8_t broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -113,7 +113,45 @@ static void stop_wifi() {
 }
 
 static void receive_callback(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
+    const uint8_t *src_addr = recv_info->src_addr;
+    const uint8_t *des_addr = recv_info->des_addr;
 
+    if (src_addr == NULL || data == NULL || len <= 0) {
+        ESP_LOGE(TAG, "receive call back argument error");
+        return;
+    }
+
+    ESP_LOGI(TAG, "receive callback source address: %02x:%02x:%02x:%02x:%02x:%02x",
+        src_addr[0],
+        src_addr[1],
+        src_addr[2],
+        src_addr[3],
+        src_addr[4],
+        src_addr[5]);
+
+    ESP_LOGI(TAG, "receive callback destination address: %02x:%02x:%02x:%02x:%02x:%02x",
+        des_addr[0],
+        des_addr[1],
+        des_addr[2],
+        des_addr[3],
+        des_addr[4],
+        des_addr[5]);
+
+    struct esp_now_event evt;
+    struct esp_now_receive_event *recv_evt = &evt.data.receive_event;
+    evt.event_id = ESP_NOW_EVENT_RECEIVE;
+    memcpy(recv_evt->mac_addr, src_addr, ESP_NOW_ETH_ALEN);
+    recv_evt->data = malloc(len);
+    if (recv_evt->data == NULL) {
+        ESP_LOGE(TAG, "malloc receive data fail");
+        return;
+    }
+    memcpy(recv_evt->data, data, len);
+    recv_evt->data_len = len;
+    if (xQueueSend(esp_now_queue, &evt, QUEUE_MAX_DELAY) != pdTRUE) {
+        ESP_LOGW(TAG, "send receive queue fail");
+        free(recv_evt->data);
+    }
 }
 
 static void send_callback(const uint8_t *mac_addr, const esp_now_send_status_t status) {
@@ -128,7 +166,7 @@ static void send_callback(const uint8_t *mac_addr, const esp_now_send_status_t s
     send_event->status = status;
     memcpy(send_event->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
 
-    if (xQueueSend(esp_now_queue, &event, QUEUE_MAXDELAY) != pdTRUE) {
+    if (xQueueSend(esp_now_queue, &event, QUEUE_MAX_DELAY) != pdTRUE) {
         ESP_LOGW(TAG, "send callback queue send failed.");
     }
 }
@@ -148,6 +186,7 @@ static int start_esp_now() {
     ESP_ERROR_CHECK( esp_now_register_recv_cb(receive_callback) );
 
     // add broadcast mac to list of peers so we can use it for bootstrapping
+    // TODO: don't need to add broadcast mac if in client mode
     esp_now_peer_info_t peer_info;
     peer_info.channel = WIFI_PRIMARY_CHANNEL;
     peer_info.ifidx = ESP_IF_WIFI_STA;
@@ -243,13 +282,54 @@ static int esp_now_controller_process(const uint8_t *msg_buffer) {
     return ESP_OK;
 }
 
+static int esp_now_parse_message(const uint8_t *msg, const size_t msg_len, struct esp_now_msg_header **hdr) {
+    // TODO make sure the given buffer is big enough and we don't have a truncated message
+    *hdr = (struct esp_now_msg_header *)msg;
+
+    // CRC check
+    const uint16_t crc = (*hdr)->crc;
+    (*hdr)->crc = 0;
+    const uint16_t crc_cal = esp_crc16_le(UINT16_MAX, msg, msg_len);
+
+    ESP_LOGI(TAG, "CRC: 0x%04X", crc);
+    ESP_LOGI(TAG, "CRC CALC: 0x%04X", crc_cal);
+    if (crc_cal != crc) {
+        ESP_LOGW(TAG, "CRC CHECK FAILED: 0x%04X 0x%04X", crc, crc_cal);
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
 static int esp_now_client_process() {
-    // process each event in the queue
-    // if send event check for failures and log them and potentially resend them
-    // if receive event
-        // register broadcast message in register mode, add to peer list, register-ack mode
-            // send unicast register message to controller
-        // register-ack unicast message, change to ready mode
+    // TODO: figure out what to do with sequence number, do we really care if messages are in order
+
+    struct esp_now_event event;
+    while (xQueueReceive(esp_now_queue, &event, 0) == pdTRUE) {
+        ESP_LOGI(TAG, "Received event: %d", event.event_id);
+        if (event.event_id == ESP_NOW_EVENT_SEND) {
+            if (event.data.send_event.status == ESP_NOW_SEND_SUCCESS) {
+                ESP_LOGI(TAG, "message sent successfully!");
+            }
+            // if this message failed, restart registration
+        } else if (event.event_id == ESP_NOW_EVENT_RECEIVE) {
+            const struct esp_now_receive_event *receive_event = &event.data.receive_event;
+            struct esp_now_msg_header *hdr;
+            if (esp_now_parse_message(receive_event->data, receive_event->data_len, &hdr) != ESP_OK)
+                continue;
+            if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG) {
+                // make sure this is a register message type
+                // add mac to peer list
+                // send unicast message to controller tell which client we are
+                // change connection state to register-ack
+            } else if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG_ACK) {
+                // make sure this is a register-ack message type
+                // change connection state to ready
+            } else if (esp_now_conn_state == ESP_NOW_CONN_STATE_READY) {
+                // take action based on the message type
+            }
+            free(receive_event->data);
+        }
+    }
 
     return ESP_OK;
 }
@@ -312,6 +392,8 @@ void app_main(void)
     }
     ESP_ERROR_CHECK( ret );
 
+    // TODO: put all esp-now stuff in own esp-idf component for sharing
+
     // TODO: Setup queue to communicate between tasks, the can task will need to send messages on the esp-now network
     // the esp-now task will need to tell can task to shutdown
     // can task will need to tell esp-now task to shutdown
@@ -320,4 +402,6 @@ void app_main(void)
     xTaskCreate(sensor_network_task, "esp_now_task", 8192, NULL, 4, &taskHandle);
 
     // TODO: infinite loop to monitor tasks
+
+    // TODO: find peek memory usage by esp-now task so can give proper heap size
 }

@@ -43,19 +43,6 @@
 
 #define QUEUE_MAX_DELAY                 512
 
-static bool wifi_long_range = true;
-static uint8_t esp_now_mode = ESP_NOW_CLIENT_MODE;
-static uint8_t esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
-static const char *TAG = "battery_sensor";
-static uint8_t broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-static QueueHandle_t esp_now_queue = NULL;
-static uint16_t seq = 0;
-static uint8_t magic = 132;
-static uint8_t wifi_mac[ESP_NOW_ETH_ALEN];
-
-// client states
-static uint8_t client_states[ESP_NOW_NUM_CLIENTS];
-
 struct esp_now_send_event{
     uint8_t mac_addr[ESP_NOW_ETH_ALEN];
     esp_now_send_status_t status;
@@ -78,10 +65,24 @@ struct esp_now_event {
 };
 
 struct esp_now_msg_header{
-    uint32_t flags; // bit field (type, magic, broadcast/unicast, msg length)
-    uint16_t seq_num;
+    uint32_t flags; // bit field (type, broadcast/unicast, msg length)
+    uint16_t magic;
     uint16_t crc;
 };
+
+// client states
+static uint8_t client_states[ESP_NOW_NUM_CLIENTS];
+
+static bool wifi_long_range = true;
+static uint8_t esp_now_mode = ESP_NOW_CLIENT_MODE;
+static uint8_t esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
+static const char *TAG = "battery_sensor";
+static uint8_t broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+static QueueHandle_t esp_now_queue = NULL;
+static uint8_t magic = 132;
+static uint8_t wifi_mac[ESP_NOW_ETH_ALEN];
+static size_t broadcast_message_size = sizeof(struct esp_now_msg_header);
+static uint8_t *msg_buffer;
 
 /**
  * @brief start the wi-fi driver, needed to create an esp-now network
@@ -222,32 +223,32 @@ static bool all_clients_checked_in() {
     return all_checked_in;
 }
 
-static int send_broadcast_register_message(const uint8_t *msg_buffer) {
-    // |0                |0000        |00000000 |00000000      |00000000000|
-    // |broadcast/unicast|message type|magic    |message length|unused     |
+static int send_broadcast_register_message() {
+    // |0                |0000        |00000000   |0000000000000000000|
+    // |broadcast/unicast|message type|msg_len    |unused             |
     // example flags - 0 0000 10000100 00000110 00000000000 - 69218304
     uint32_t flags = ESP_NOW_MSG_BROADCAST;
     flags <<= 4; // width of message type 4 bits
     flags = flags | ESP_NOW_MSG_TYPE_REG;
-    flags <<= 8; // width of magic number 8 bits
-    flags |= magic;
     flags <<= 8; // width of message length
-    flags |= ESP_NOW_ETH_ALEN;
-    flags <<= 11; // left over bits
+    flags |= 0; // broadcast register message contains no data
+    flags <<= 19; // left over bits
 
-    const size_t full_msg_size = sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN;
     struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)msg_buffer;
     hdr->flags = flags;
-    hdr->seq_num = seq++;
+    hdr->magic = magic;
     hdr->crc = 0;
-    memcpy((void *)(sizeof(struct esp_now_msg_header) + msg_buffer), wifi_mac, ESP_NOW_ETH_ALEN);
-    hdr->crc = esp_crc16_le(UINT16_MAX, msg_buffer, full_msg_size);
-    const esp_err_t result = esp_now_send(broadcast_mac, msg_buffer, full_msg_size);
+    hdr->crc = esp_crc16_le(UINT16_MAX, msg_buffer, broadcast_message_size);
+    const esp_err_t result = esp_now_send(broadcast_mac, msg_buffer, broadcast_message_size);
     ESP_LOGI(TAG, "Broadcast register message sent: %d", result);
     return result;
 }
 
-static int esp_now_controller_process(const uint8_t *msg_buffer) {
+// static int send_registration_ack_message(const uint8_t *msg_buffer) {
+//
+// }
+
+static int esp_now_controller_process() {
     // process each event on the queue
     // if send event check for failures and potentially resend messages
         // if register_ack and success mark client as registered
@@ -276,7 +277,7 @@ static int esp_now_controller_process(const uint8_t *msg_buffer) {
         if (all_clients_checked_in())
             esp_now_conn_state = ESP_NOW_CONN_STATE_READY;
         else
-            return send_broadcast_register_message(msg_buffer);
+            return send_broadcast_register_message();
     }
 
     return ESP_OK;
@@ -345,12 +346,12 @@ static void sensor_network_task(void *pvParameter) {
         client_states[i] = ESP_NOW_CONN_STATE_REG;
     }
 
-    uint8_t *msg_buffer = malloc(sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
+    msg_buffer = malloc(broadcast_message_size);
     if (msg_buffer == NULL) {
         ESP_LOGE(TAG, "message buffer allocation failed!");
         goto graceful_exit;
     }
-    memset(msg_buffer, 0, sizeof(struct esp_now_msg_header) + ESP_NOW_ETH_ALEN);
+    memset(msg_buffer, 0, broadcast_message_size);
 
     int result = ESP_OK;
 
@@ -361,7 +362,7 @@ static void sensor_network_task(void *pvParameter) {
         if (esp_now_mode == ESP_NOW_CLIENT_MODE)
             result = esp_now_client_process();
         if (esp_now_mode == ESP_NOW_CONTROLLER_MODE)
-            result = esp_now_controller_process(msg_buffer);
+            result = esp_now_controller_process();
 
         if (result != ESP_OK) { // catastrophic failure try restart?
             break;

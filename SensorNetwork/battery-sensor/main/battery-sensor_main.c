@@ -81,7 +81,7 @@ static uint8_t broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 static QueueHandle_t esp_now_queue = NULL;
 static uint8_t magic = 132;
 static uint8_t wifi_mac[ESP_NOW_ETH_ALEN];
-static size_t broadcast_message_size = sizeof(struct esp_now_msg_header);
+static size_t common_message_size = sizeof(struct esp_now_msg_header);
 static uint8_t *msg_buffer;
 
 /**
@@ -172,6 +172,17 @@ static void send_callback(const uint8_t *mac_addr, const esp_now_send_status_t s
     }
 }
 
+static int add_peer(const uint8_t *mac_addr) {
+    if (esp_now_is_peer_exist(mac_addr))
+        return ESP_OK;
+    esp_now_peer_info_t peer_info;
+    peer_info.channel = WIFI_PRIMARY_CHANNEL;
+    peer_info.ifidx = ESP_IF_WIFI_STA;
+    peer_info.encrypt = false;
+    memcpy(&(peer_info.peer_addr), mac_addr, ESP_NOW_ETH_ALEN);
+    return esp_now_add_peer(&peer_info);
+}
+
 /**
  * @brief start esp_now service and any accompanying objects
  */
@@ -187,13 +198,8 @@ static int start_esp_now() {
     ESP_ERROR_CHECK( esp_now_register_recv_cb(receive_callback) );
 
     // add broadcast mac to list of peers so we can use it for bootstrapping
-    // TODO: don't need to add broadcast mac if in client mode
-    esp_now_peer_info_t peer_info;
-    peer_info.channel = WIFI_PRIMARY_CHANNEL;
-    peer_info.ifidx = ESP_IF_WIFI_STA;
-    peer_info.encrypt = false;
-    memcpy(&(peer_info.peer_addr), broadcast_mac, ESP_NOW_ETH_ALEN);
-    ESP_ERROR_CHECK( esp_now_add_peer(&peer_info) );
+    if (esp_now_mode == ESP_NOW_CONTROLLER_MODE)
+        ESP_ERROR_CHECK(add_peer(broadcast_mac));
 
     // start in register mode
     esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
@@ -238,15 +244,29 @@ static int send_broadcast_register_message() {
     hdr->flags = flags;
     hdr->magic = magic;
     hdr->crc = 0;
-    hdr->crc = esp_crc16_le(UINT16_MAX, msg_buffer, broadcast_message_size);
-    const esp_err_t result = esp_now_send(broadcast_mac, msg_buffer, broadcast_message_size);
+    hdr->crc = esp_crc16_le(UINT16_MAX, msg_buffer, common_message_size);
+    const esp_err_t result = esp_now_send(broadcast_mac, msg_buffer, common_message_size);
     ESP_LOGI(TAG, "Broadcast register message sent: %d", result);
     return result;
 }
 
-// static int send_registration_ack_message(const uint8_t *msg_buffer) {
-//
-// }
+static int send_registration_ack_message(const uint8_t *mac_addr) {
+    uint32_t flags = ESP_NOW_MSG_UNICAST;
+    flags <<= 4; // width of message type 4 bits
+    flags = flags | ESP_NOW_MSG_TYPE_REG_ACK;
+    flags <<= 8; // width of message length
+    flags |= 0; // unicast register ack message contains no data
+    flags <<= 19; // left over bits
+
+    struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)msg_buffer;
+    hdr->flags = flags;
+    hdr->magic = magic;
+    hdr->crc = 0;
+    hdr->crc = esp_crc16_le(UINT16_MAX, msg_buffer, common_message_size);
+    const esp_err_t result = esp_now_send(mac_addr, msg_buffer, common_message_size);
+    ESP_LOGI(TAG, "register-ack message sent: %d", result);
+    return result;
+}
 
 static int esp_now_controller_process() {
     // process each event on the queue
@@ -301,6 +321,15 @@ static int esp_now_parse_message(const uint8_t *msg, const size_t msg_len, struc
     return ESP_OK;
 }
 
+static uint8_t get_message_type(const struct esp_now_msg_header *hdr) {
+    // |0                |0000        |00000000   |0000000000000000000|
+    // |broadcast/unicast|message type|msg_len    |unused             |
+    uint32_t type_mask = 15;
+    type_mask <<= 27;
+    const uint32_t type = (hdr->flags & type_mask) >> 27;
+    return (uint8_t)type;
+}
+
 static int esp_now_client_process() {
     // TODO: figure out what to do with sequence number, do we really care if messages are in order
 
@@ -310,8 +339,12 @@ static int esp_now_client_process() {
         if (event.event_id == ESP_NOW_EVENT_SEND) {
             if (event.data.send_event.status == ESP_NOW_SEND_SUCCESS) {
                 ESP_LOGI(TAG, "message sent successfully!");
+            } else {
+                if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG_ACK) {
+                    ESP_LOGI(TAG, "register ack message failed to send, reset state to register");
+                    esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
+                }
             }
-            // if this message failed, restart registration
         } else if (event.event_id == ESP_NOW_EVENT_RECEIVE) {
             const struct esp_now_receive_event *receive_event = &event.data.receive_event;
             struct esp_now_msg_header *hdr;
@@ -322,6 +355,11 @@ static int esp_now_client_process() {
                 // add mac to peer list
                 // send unicast message to controller tell which client we are
                 // change connection state to register-ack
+                if (get_message_type(hdr) == ESP_NOW_MSG_TYPE_REG) {
+                    add_peer(receive_event->mac_addr);
+                    if (send_registration_ack_message(receive_event->mac_addr) == ESP_OK)
+                        esp_now_conn_state = ESP_NOW_CONN_STATE_REG_ACK;
+                }
             } else if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG_ACK) {
                 // make sure this is a register-ack message type
                 // change connection state to ready
@@ -346,12 +384,12 @@ static void sensor_network_task(void *pvParameter) {
         client_states[i] = ESP_NOW_CONN_STATE_REG;
     }
 
-    msg_buffer = malloc(broadcast_message_size);
+    msg_buffer = malloc(common_message_size);
     if (msg_buffer == NULL) {
         ESP_LOGE(TAG, "message buffer allocation failed!");
         goto graceful_exit;
     }
-    memset(msg_buffer, 0, broadcast_message_size);
+    memset(msg_buffer, 0, common_message_size);
 
     int result = ESP_OK;
 
@@ -368,8 +406,10 @@ static void sensor_network_task(void *pvParameter) {
             break;
         }
 
-        // run about 4 times a second
-        vTaskDelay(250 / portTICK_PERIOD_MS);
+        if (esp_now_mode == ESP_NOW_CLIENT_MODE)
+            vTaskDelay(250 / portTICK_PERIOD_MS);
+        else
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
 graceful_exit:

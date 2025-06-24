@@ -72,9 +72,10 @@ struct esp_now_msg_header{
 
 // client states
 static uint8_t client_states[ESP_NOW_NUM_CLIENTS];
+static uint8_t client_macs[ESP_NOW_NUM_CLIENTS][ESP_NOW_ETH_ALEN];
 
 static bool wifi_long_range = true;
-static uint8_t esp_now_mode = ESP_NOW_CLIENT_MODE;
+static uint8_t esp_now_mode = ESP_NOW_CONTROLLER_MODE;
 static uint8_t esp_now_conn_state = ESP_NOW_CONN_STATE_REG;
 static const char *TAG = "battery_sensor";
 static uint8_t broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -250,6 +251,7 @@ static int send_broadcast_register_message() {
     return result;
 }
 
+// TODO: Add client id to header flags so controller knows which client from
 static int send_registration_ack_message(const uint8_t *mac_addr) {
     uint32_t flags = ESP_NOW_MSG_UNICAST;
     flags <<= 4; // width of message type 4 bits
@@ -269,27 +271,27 @@ static int send_registration_ack_message(const uint8_t *mac_addr) {
 }
 
 static int esp_now_controller_process() {
-    // process each event on the queue
-    // if send event check for failures and potentially resend messages
-        // if register_ack and success mark client as registered
-    // if receive event
-        // unicast register message and not registered, register the peer
-        // send unicast register_ack message to client
-
-    // register mode
-    // if not all the clients have checked in (received unicast register and register_ack sent successfully),
-        // send broadcast register message
-    // if all have checked in change mode to ready
-
     struct esp_now_event event;
     while (xQueueReceive(esp_now_queue, &event, 0) == pdTRUE) {
         ESP_LOGI(TAG, "Received event: %d", event.event_id);
         if (event.event_id == ESP_NOW_EVENT_SEND) {
             if (event.data.send_event.status == ESP_NOW_SEND_SUCCESS) {
                 ESP_LOGI(TAG, "broadcast message sent successfully!");
+                // if unicast message
+                // find the client with the associated mac address
+                // if client in reg-ack state, update to ready state
             }
+            // if there is a failure, and it's not a broadcast message
+            // find id of client the message was to
+            // if client in reg-ack state resend reg-ack message
         } else if (event.event_id == ESP_NOW_EVENT_RECEIVE) {
-
+            // verify message header CRC and magic
+            // if reg-ack message
+                // get client id from message
+                // save mac for the given client
+                // add peer for client
+                // update client state to reg-ack
+                // send reg-ack message to client completing registration
         }
     }
 
@@ -351,10 +353,6 @@ static int esp_now_client_process() {
             if (esp_now_parse_message(receive_event->data, receive_event->data_len, &hdr) != ESP_OK)
                 continue;
             if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG) {
-                // make sure this is a register message type
-                // add mac to peer list
-                // send unicast message to controller tell which client we are
-                // change connection state to register-ack
                 if (get_message_type(hdr) == ESP_NOW_MSG_TYPE_REG) {
                     add_peer(receive_event->mac_addr);
                     if (send_registration_ack_message(receive_event->mac_addr) == ESP_OK)

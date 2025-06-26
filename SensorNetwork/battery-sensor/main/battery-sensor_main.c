@@ -25,6 +25,7 @@
 #define ESP_NOW_VCU_CLIENT              1
 #define ESP_NOW_BATTERY_CLIENT          2
 #define ESP_NOW_NUM_CLIENTS             3
+#define ESP_NOW_CONTROLLER_CLIENT       3
 
 #define ESP_NOW_QUEUE_SIZE              10
 
@@ -231,15 +232,17 @@ static bool all_clients_checked_in() {
 }
 
 static int send_broadcast_register_message() {
-    // |0                |0000        |00000000   |0000000000000000000|
-    // |broadcast/unicast|message type|msg_len    |unused             |
+    // |0                |0000        |0000     |00000000   |000000000000000|
+    // |broadcast/unicast|message type|client id|msg_len    |unused         |
     // example flags - 0 0000 10000100 00000110 00000000000 - 69218304
     uint32_t flags = ESP_NOW_MSG_BROADCAST;
     flags <<= 4; // width of message type 4 bits
     flags = flags | ESP_NOW_MSG_TYPE_REG;
+    flags <<= 4; // width of client id
+    flags |= ESP_NOW_CONTROLLER_CLIENT;
     flags <<= 8; // width of message length
     flags |= 0; // broadcast register message contains no data
-    flags <<= 19; // left over bits
+    flags <<= 15; // left over bits
 
     struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)msg_buffer;
     hdr->flags = flags;
@@ -251,14 +254,15 @@ static int send_broadcast_register_message() {
     return result;
 }
 
-// TODO: Add client id to header flags so controller knows which client from
-static int send_registration_ack_message(const uint8_t *mac_addr) {
+static int send_registration_ack_message(const uint8_t *mac_addr, const uint8_t client_id) {
     uint32_t flags = ESP_NOW_MSG_UNICAST;
     flags <<= 4; // width of message type 4 bits
     flags = flags | ESP_NOW_MSG_TYPE_REG_ACK;
+    flags <<= 4; // width of client id
+    flags |= client_id;
     flags <<= 8; // width of message length
     flags |= 0; // unicast register ack message contains no data
-    flags <<= 19; // left over bits
+    flags <<= 15; // left over bits
 
     struct esp_now_msg_header *hdr = (struct esp_now_msg_header *)msg_buffer;
     hdr->flags = flags;
@@ -270,44 +274,15 @@ static int send_registration_ack_message(const uint8_t *mac_addr) {
     return result;
 }
 
-static int esp_now_controller_process() {
-    struct esp_now_event event;
-    while (xQueueReceive(esp_now_queue, &event, 0) == pdTRUE) {
-        ESP_LOGI(TAG, "Received event: %d", event.event_id);
-        if (event.event_id == ESP_NOW_EVENT_SEND) {
-            if (event.data.send_event.status == ESP_NOW_SEND_SUCCESS) {
-                ESP_LOGI(TAG, "broadcast message sent successfully!");
-                // if unicast message
-                // find the client with the associated mac address
-                // if client in reg-ack state, update to ready state
-            }
-            // if there is a failure, and it's not a broadcast message
-            // find id of client the message was to
-            // if client in reg-ack state resend reg-ack message
-        } else if (event.event_id == ESP_NOW_EVENT_RECEIVE) {
-            // verify message header CRC and magic
-            // if reg-ack message
-                // get client id from message
-                // save mac for the given client
-                // add peer for client
-                // update client state to reg-ack
-                // send reg-ack message to client completing registration
-        }
-    }
-
-    if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG) {
-        if (all_clients_checked_in())
-            esp_now_conn_state = ESP_NOW_CONN_STATE_READY;
-        else
-            return send_broadcast_register_message();
-    }
-
-    return ESP_OK;
-}
-
 static int esp_now_parse_message(const uint8_t *msg, const size_t msg_len, struct esp_now_msg_header **hdr) {
     // TODO make sure the given buffer is big enough and we don't have a truncated message
     *hdr = (struct esp_now_msg_header *)msg;
+
+    // is it magical
+    if ((*hdr)->magic != magic) {
+        ESP_LOGW(TAG, "message has wrong magic.");
+        return ESP_FAIL;
+    }
 
     // CRC check
     const uint16_t crc = (*hdr)->crc;
@@ -324,12 +299,79 @@ static int esp_now_parse_message(const uint8_t *msg, const size_t msg_len, struc
 }
 
 static uint8_t get_message_type(const struct esp_now_msg_header *hdr) {
-    // |0                |0000        |00000000   |0000000000000000000|
-    // |broadcast/unicast|message type|msg_len    |unused             |
     uint32_t type_mask = 15;
     type_mask <<= 27;
     const uint32_t type = (hdr->flags & type_mask) >> 27;
     return (uint8_t)type;
+}
+
+static uint8_t get_message_client_id(const struct esp_now_msg_header *hdr) {
+    uint32_t type_mask = 15;
+    type_mask <<= 23;
+    const uint32_t client_id = (hdr->flags & type_mask) >> 23;
+    return (uint8_t)client_id;
+}
+
+static uint8_t find_client_id_with_mac(const uint8_t *mac_addr) {
+    for (uint8_t i = 0; i < ESP_NOW_NUM_CLIENTS; i++) {
+        const int result = memcmp(mac_addr, client_macs[i], ESP_NOW_ETH_ALEN);
+        ESP_LOGI(TAG, "mac memcmp result: (%d) %d", i, result);
+        if (result == 0)
+            return i;
+    }
+    return ESP_NOW_NUM_CLIENTS;
+}
+
+static int esp_now_controller_process() {
+    struct esp_now_event event;
+    while (xQueueReceive(esp_now_queue, &event, 0) == pdTRUE) {
+        ESP_LOGI(TAG, "Received event: %d", event.event_id);
+        if (event.event_id == ESP_NOW_EVENT_SEND) {
+            const bool is_broadcast = memcmp(event.data.send_event.mac_addr, broadcast_mac, ESP_NOW_ETH_ALEN) == 0;
+            uint8_t client_id = 0;
+            if (!is_broadcast)
+                client_id = find_client_id_with_mac(event.data.send_event.mac_addr); // find the client with the associated mac address
+            if (event.data.send_event.status == ESP_NOW_SEND_SUCCESS) {
+                if (is_broadcast)
+                    ESP_LOGI(TAG, "broadcast message sent successfully!");
+                else {
+                    if (client_id < ESP_NOW_NUM_CLIENTS && client_states[client_id] == ESP_NOW_CONN_STATE_REG_ACK) {
+                        client_states[client_id] = ESP_NOW_CONN_STATE_READY;
+                        ESP_LOGI(TAG, "client id, %d is ready!", client_id);
+                    }
+                }
+            } else {
+                // if there is a failure, and it's not a broadcast message, and it's a reg-ack, resend
+                if (!is_broadcast && client_id < ESP_NOW_NUM_CLIENTS && client_states[client_id] == ESP_NOW_CONN_STATE_REG_ACK) {
+                    send_registration_ack_message(event.data.send_event.mac_addr, ESP_NOW_CONTROLLER_CLIENT);
+                }
+            }
+        } else if (event.event_id == ESP_NOW_EVENT_RECEIVE) {
+            // verify message header CRC and magic
+            const struct esp_now_receive_event *receive_event = &event.data.receive_event;
+            struct esp_now_msg_header *hdr;
+            if (esp_now_parse_message(receive_event->data, receive_event->data_len, &hdr) != ESP_OK)
+                continue;
+            // if reg-ack message does it matter what state we are in no we'll just respond no matter what
+            if (get_message_type(hdr) == ESP_NOW_MSG_TYPE_REG_ACK) {
+                const uint8_t client_id = get_message_client_id(hdr);
+                memcpy(client_macs[client_id], receive_event->mac_addr, ESP_NOW_ETH_ALEN); // save mac for the given client
+                add_peer(receive_event->mac_addr);
+                // send reg-ack message to client completing registration
+                if (send_registration_ack_message(receive_event->mac_addr, ESP_NOW_CONTROLLER_CLIENT) == ESP_OK)
+                    client_states[client_id] = ESP_NOW_CONN_STATE_REG_ACK; // update client state to reg-ack
+            }
+        }
+    }
+
+    if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG) {
+        if (all_clients_checked_in())
+            esp_now_conn_state = ESP_NOW_CONN_STATE_READY;
+        else
+            return send_broadcast_register_message();
+    }
+
+    return ESP_OK;
 }
 
 static int esp_now_client_process() {
@@ -355,12 +397,17 @@ static int esp_now_client_process() {
             if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG) {
                 if (get_message_type(hdr) == ESP_NOW_MSG_TYPE_REG) {
                     add_peer(receive_event->mac_addr);
-                    if (send_registration_ack_message(receive_event->mac_addr) == ESP_OK)
+                    if (send_registration_ack_message(receive_event->mac_addr, ESP_NOW_BATTERY_CLIENT) == ESP_OK)
                         esp_now_conn_state = ESP_NOW_CONN_STATE_REG_ACK;
                 }
             } else if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG_ACK) {
+                // TODO: timeout if we've in the reg-ack state for too long
                 // make sure this is a register-ack message type
                 // change connection state to ready
+                if (get_message_type(hdr) == ESP_NOW_MSG_TYPE_REG_ACK && get_message_client_id(hdr) == ESP_NOW_CONTROLLER_CLIENT) {
+                    esp_now_conn_state = ESP_NOW_CONN_STATE_READY;
+                    ESP_LOGI(TAG, "connection to controller ready!");
+                }
             } else if (esp_now_conn_state == ESP_NOW_CONN_STATE_READY) {
                 // take action based on the message type
             }
@@ -399,6 +446,8 @@ static void sensor_network_task(void *pvParameter) {
             result = esp_now_client_process();
         if (esp_now_mode == ESP_NOW_CONTROLLER_MODE)
             result = esp_now_controller_process();
+
+        // TODO: Change led color based on connection status
 
         if (result != ESP_OK) { // catastrophic failure try restart?
             break;

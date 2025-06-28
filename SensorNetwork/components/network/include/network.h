@@ -3,14 +3,14 @@
 
 #include <stdint.h>
 
-#define NETWORK_CLIENT_MODE             0
-#define NETWORK_CONTROLLER_MODE         1
+#define NETWORK_MODE_CLIENT             0
+#define NETWORK_MODE_CONTROLLER         1
 
-#define NETWORK_NUM_CLIENTS             3
-#define NETWORK_COOLANT_CLIENT          0
-#define NETWORK_VCU_CLIENT              1
-#define NETWORK_BATTERY_CLIENT          2
-#define NETWORK_CONTROLLER_CLIENT       14
+#define NETWORK_CLIENT_COUNT            3
+#define NETWORK_CLIENT_COOLANT          0
+#define NETWORK_CLIENT_VCU              1
+#define NETWORK_CLIENT_BATTERY          2
+#define NETWORK_CLIENT_CONTROLLER       14
 
 /**
  * @struct network_config

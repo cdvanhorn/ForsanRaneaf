@@ -46,6 +46,12 @@ struct network_event {
     union network_event_data data;
 };
 
+struct network_msg_header{
+    uint32_t flags; // bit field (type, broadcast/unicast, msg length)
+    uint16_t magic;
+    uint16_t crc;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 // COMPONENT VARIABLES
 ///////////////////////////////////////////////////////////////////////////////
@@ -54,10 +60,14 @@ static const char *LOG_TAG = "sensor_network"; //!< char pointer - logging group
 static uint8_t wifi_mac[ESP_NOW_ETH_ALEN]; //!< byte array - holds mac address for this node
 
 static const uint8_t network_broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }; //!< byte array contains broadcast mac address
+static size_t network_largest_message_size = sizeof(struct network_msg_header); //!< size_t, largest message size used to allocate a message buffer
+static uint8_t *msg_buffer; //!< byte array used for message buffer
 static QueueHandle_t network_event_queue = NULL; //!< QueueHandle_t esp_now queue that will hold esp_now network events to be processed
 static uint8_t network_mode = 0; //!< uint8_t what mode is node controller or client
 static uint8_t network_client_id = 0; //!< uint8_t what is the client id for this node
 static uint8_t network_conn_state = NETWORK_CONN_STATE_REG; //!< uint8_t what is the current connection state, register, register-ack, or ready
+static uint8_t network_client_states[NETWORK_CLIENT_COUNT]; //!< uint8_t array, connection state for each client used by the controller
+static uint8_t network_client_macs[NETWORK_CLIENT_COUNT][ESP_NOW_ETH_ALEN]; //!< 2 dimensional byte array containing client mac addresses
 
 ///////////////////////////////////////////////////////////////////////////////
 // PRIVATE FUNCTIONS
@@ -71,6 +81,16 @@ static void log_mac_debug(const uint8_t *mac_addr) {
         mac_addr[3],
         mac_addr[4],
         mac_addr[5]);
+}
+
+static uint8_t find_client_id_with_mac(const uint8_t *mac_addr) {
+    for (uint8_t i = 0; i < NETWORK_CLIENT_COUNT; i++) {
+        const int result = memcmp(mac_addr, network_client_macs[i], ESP_NOW_ETH_ALEN);
+        ESP_LOGI(LOG_TAG, "mac memory compare result: (%d) %d", i, result);
+        if (result == 0)
+            return i;
+    }
+    return NETWORK_CLIENT_COUNT;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -202,7 +222,7 @@ static int network_start() {
     ESP_ERROR_CHECK( esp_now_register_send_cb(network_send_callback) );
 
     // add broadcast mac to list of peers so we can use it for bootstrapping
-    if (network_mode == NETWORK_CONTROLLER_MODE)
+    if (network_mode == NETWORK_MODE_CONTROLLER)
         ESP_ERROR_CHECK(network_add_peer(network_broadcast_mac));
 
     // start in register mode
@@ -222,16 +242,138 @@ static void network_stop() {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// NETWORK MESSAGE METHODS
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// NETWORK QUEUE PROCESSORS
+///////////////////////////////////////////////////////////////////////////////
+
+static int esp_now_controller_process() {
+    struct network_event event;
+    while (xQueueReceive(network_event_queue, &event, 0) == pdTRUE) {
+        ESP_LOGI(LOG_TAG, "Received event: %d", event.event_id);
+        if (event.event_id == NETWORK_EVENT_SEND) {
+            const bool is_broadcast = memcmp(event.data.send_event.mac_addr, network_broadcast_mac, ESP_NOW_ETH_ALEN) == 0;
+            uint8_t client_id = 0; // what client did we send this message to
+            if (!is_broadcast)
+                client_id = find_client_id_with_mac(event.data.send_event.mac_addr); // find the client with the associated mac address
+            if (event.data.send_event.status == ESP_NOW_SEND_SUCCESS) {
+                if (is_broadcast)
+                    ESP_LOGD(LOG_TAG, "broadcast message sent successfully!");
+                else {
+                    // if we send a reg-ack to a client, and it's successful the connection to that client is ready
+                    if (client_id < NETWORK_CLIENT_COUNT && network_client_states[client_id] == NETWORK_CONN_STATE_REG_ACK) {
+                        network_client_states[client_id] = NETWORK_CONN_STATE_READY;
+                        ESP_LOGI(LOG_TAG, "client id, %d is ready!", client_id);
+                    }
+                }
+            } else { // send was a failure, the destination didn't acknowledge
+                // if there is a failure, and it's not a broadcast message, and it's a reg-ack, resend
+                if (!is_broadcast && client_id < NETWORK_CLIENT_COUNT && network_client_states[client_id] == NETWORK_CONN_STATE_REG_ACK) {
+                    send_registration_ack_message(event.data.send_event.mac_addr, NETWORK_CLIENT_CONTROLLER);
+                }
+            }
+        } else if (event.event_id == ESP_NOW_EVENT_RECEIVE) {
+            // verify message header CRC and magic
+            const struct esp_now_receive_event *receive_event = &event.data.receive_event;
+            struct esp_now_msg_header *hdr;
+            if (esp_now_parse_message(receive_event->data, receive_event->data_len, &hdr) != ESP_OK)
+                continue;
+            // if reg-ack message does it matter what state we are in no we'll just respond no matter what
+            if (get_message_type(hdr) == ESP_NOW_MSG_TYPE_REG_ACK) {
+                const uint8_t client_id = get_message_client_id(hdr);
+                memcpy(client_macs[client_id], receive_event->mac_addr, ESP_NOW_ETH_ALEN); // save mac for the given client
+                add_peer(receive_event->mac_addr);
+                // send reg-ack message to client completing registration
+                if (send_registration_ack_message(receive_event->mac_addr, ESP_NOW_CONTROLLER_CLIENT) == ESP_OK)
+                    client_states[client_id] = ESP_NOW_CONN_STATE_REG_ACK; // update client state to reg-ack
+            }
+        }
+    }
+
+    if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG) {
+        if (all_clients_checked_in())
+            esp_now_conn_state = ESP_NOW_CONN_STATE_READY;
+        else
+            return send_broadcast_register_message();
+    }
+
+    return ESP_OK;
+}
+
 void network_task(void *pvParameter) {
-    // TODO: get network mode and client id from pvParameter
+    struct network_config *ncfg = (struct network_config *)pvParameter;
+    network_client_id = ncfg->client_id;
+    network_mode = ncfg->mode;
+
     wifi_start();
     ESP_LOGI(LOG_TAG, "WIFI interface started in station mode at 2.4G!");
 
     network_start();
     ESP_LOGI(LOG_TAG, "ESP-NOW network started!");
 
-//graceful_exit: // cleanup
-    // free(msg_buffer);
+    // log configuration information
+    if (network_mode == NETWORK_MODE_CONTROLLER) {
+        ESP_LOGI(LOG_TAG, "Network controller started");
+        network_client_id = NETWORK_CLIENT_CONTROLLER; // hard code the client id if in controller mode
+    } else {
+        ESP_LOGI(LOG_TAG, "Network client started");
+    }
+
+    // log client id information
+    switch (network_client_id) {
+        case NETWORK_CLIENT_BATTERY:
+            ESP_LOGI(LOG_TAG, "Network battery client!");
+            break;
+        case NETWORK_CLIENT_COOLANT:
+            ESP_LOGI(LOG_TAG, "Network coolant client!");
+            break;
+        case NETWORK_CLIENT_VCU:
+            ESP_LOGI(LOG_TAG, "Network VCU client!");
+            break;
+        case NETWORK_CLIENT_CONTROLLER:
+            break;
+        default:
+            ESP_LOGE(LOG_TAG, "Unknown client id: %d", network_client_id);
+            goto graceful_exit;
+    }
+
+    // initialize variables
+    for (uint8_t i = 0; i < NETWORK_CLIENT_COUNT; i++) {
+        network_client_states[i] = NETWORK_CONN_STATE_REG;
+    }
+
+    msg_buffer = malloc(network_largest_message_size);
+    if (msg_buffer == NULL) {
+        ESP_LOGE(LOG_TAG, "message buffer allocation failed!");
+        goto graceful_exit;
+    }
+    memset(msg_buffer, 0, network_largest_message_size);
+
+    int result = ESP_OK;
+
+    // ReSharper disable once CppDFAEndlessLoop
+    while (1) {
+        // TODO: Check if someone says we should shutdown
+
+        // if (esp_now_mode == ESP_NOW_CLIENT_MODE)
+        //     result = esp_now_client_process();
+        if (network_mode == NETWORK_MODE_CONTROLLER)
+            result = esp_now_controller_process();
+
+        // TODO: Change led color based on connection status, need to create led component to do this properly
+
+        if (result != ESP_OK) { // catastrophic failure try restart?
+            break;
+        }
+
+        vTaskDelay(250 / portTICK_PERIOD_MS);
+    }
+
+graceful_exit: // cleanup
+    free(msg_buffer);
     network_stop();
     ESP_LOGI(LOG_TAG, "ESP_NOW network stopped!");
     wifi_stop();

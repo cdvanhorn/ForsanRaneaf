@@ -140,15 +140,6 @@
 //     return (uint8_t)client_id;
 // }
 //
-// static uint8_t find_client_id_with_mac(const uint8_t *mac_addr) {
-//     for (uint8_t i = 0; i < ESP_NOW_NUM_CLIENTS; i++) {
-//         const int result = memcmp(mac_addr, client_macs[i], ESP_NOW_ETH_ALEN);
-//         ESP_LOGI(TAG, "mac memcmp result: (%d) %d", i, result);
-//         if (result == 0)
-//             return i;
-//     }
-//     return ESP_NOW_NUM_CLIENTS;
-// }
 //
 // static int esp_now_controller_process() {
 //     struct esp_now_event event;
@@ -308,14 +299,16 @@ void app_main(void)
     }
     ESP_ERROR_CHECK( ret );
 
-    // TODO: put all esp-now stuff in own esp-idf component for sharing
+    struct network_config ncfg;
+    ncfg.mode = NETWORK_MODE_CONTROLLER;
+    ncfg.client_id = NETWORK_CLIENT_CONTROLLER;
 
     // TODO: Setup queue to communicate between tasks, the can task will need to send messages on the esp-now network
     // the esp-now task will need to tell can task to shutdown
     // can task will need to tell esp-now task to shutdown
 
     TaskHandle_t taskHandle = NULL;
-    xTaskCreate(network_task, "network_task", 8192, NULL, 4, &taskHandle);
+    xTaskCreate(network_task, "network_task", 8192, &ncfg, 4, &taskHandle);
 
     // TODO: infinite loop to monitor tasks
 

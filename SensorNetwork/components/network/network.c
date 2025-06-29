@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "esp_now.h"
 #include "esp_wifi.h"
+#include "esp_crc.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // DEFINES
@@ -22,34 +23,61 @@
 #define NETWORK_EVENT_RECEIVE                   0
 #define NETWORK_EVENT_SEND                      1
 
+#define NETWORK_MSG_BROADCAST                   0
+#define NETWORK_MSG_UNICAST                     1
+
+#define NETWORK_MSG_TYPE_REG                    0
+#define NETWORK_MSG_TYPE_REG_ACK                1
+
 ///////////////////////////////////////////////////////////////////////////////
 // COMPONENT DATA TYPES
 ///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @struct network_send_event
+ * @brief representation of a send event placed on event queue during esp-now send callback
+ */
 struct network_send_event{
-    uint8_t mac_addr[ESP_NOW_ETH_ALEN];
-    esp_now_send_status_t status;
+    uint8_t mac_addr[ESP_NOW_ETH_ALEN]; //!< mac address message was sent to
+    esp_now_send_status_t status; //!< status of the sent message
 };
 
+/**
+ * @struct network_receive_event
+ * @brief representation of a receive event placed on event queue during esp-now receive callback
+ */
 struct network_receive_event {
-    uint8_t mac_addr[ESP_NOW_ETH_ALEN];
-    uint8_t *data;
-    uint16_t data_len;
+    uint8_t mac_addr[ESP_NOW_ETH_ALEN]; //!< mac address of the receive dmessage
+    uint8_t *data; //!< byte array contains the received message bytes
+    uint16_t data_len; //!< number of bytes in the received message
 };
 
+/**
+ * @union network_event_data
+ * @brief either a receive event or a send event
+ */
 union network_event_data {
-    struct network_send_event send_event;
-    struct network_receive_event receive_event;
+    struct network_send_event send_event; //!< will be populated if this is a send event
+    struct network_receive_event receive_event; //!< will be populated if this is a receive event
 };
 
+/**
+ * @struct network_event
+ * @brief representation of network event placed on event queue after a send or receive callback is triggered
+ */
 struct network_event {
-    uint8_t event_id;
-    union network_event_data data;
+    uint8_t event_type_id; //!< what type of event is this so know how to interpret the event data
+    union network_event_data data; //!< will either be a receive event or send event based on event_id
 };
 
+/**
+ * @struct network_msg_header
+ * @brief message header for esp-now messages
+ */
 struct network_msg_header{
-    uint32_t flags; // bit field (type, broadcast/unicast, msg length)
-    uint16_t magic;
-    uint16_t crc;
+    uint32_t flags; //!< bit field (broadcast/unicast, type, client id, and msg length)
+    uint16_t magic; //!< magic number used for simple message verification
+    uint16_t crc; //!< crc checksum of the whole message including header
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -60,7 +88,10 @@ static const char *LOG_TAG = "sensor_network"; //!< char pointer - logging group
 static uint8_t wifi_mac[ESP_NOW_ETH_ALEN]; //!< byte array - holds mac address for this node
 
 static const uint8_t network_broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }; //!< byte array contains broadcast mac address
-static size_t network_largest_message_size = sizeof(struct network_msg_header); //!< size_t, largest message size used to allocate a message buffer
+static uint8_t network_msg_magic = 132;
+static size_t network_largest_msg_size = sizeof(struct network_msg_header); //!< size_t, largest message size used to allocate a message buffer
+static size_t network_reg_ack_msg_size = sizeof(struct network_msg_header); //!< size_t, sizes of registration ack message
+static size_t network_reg_msg_size = sizeof(struct network_msg_header); //!< size_t, sizes of registration broadcast message
 static uint8_t *msg_buffer; //!< byte array used for message buffer
 static QueueHandle_t network_event_queue = NULL; //!< QueueHandle_t esp_now queue that will hold esp_now network events to be processed
 static uint8_t network_mode = 0; //!< uint8_t what mode is node controller or client
@@ -73,6 +104,11 @@ static uint8_t network_client_macs[NETWORK_CLIENT_COUNT][ESP_NOW_ETH_ALEN]; //!<
 // PRIVATE FUNCTIONS
 // UTILS
 ///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief log a mac address to the debug log
+ * @param mac_addr - byte array hold mac address to log as a debug message
+ */
 static void log_mac_debug(const uint8_t *mac_addr) {
     ESP_LOGD(LOG_TAG, "%02x:%02x:%02x:%02x:%02x:%02x",
         mac_addr[0],
@@ -83,6 +119,11 @@ static void log_mac_debug(const uint8_t *mac_addr) {
         mac_addr[5]);
 }
 
+/**
+ * @brief Find the client id with the given mac address
+ * @param mac_addr byte array holds mac address to find a client id for
+ * @return uint8_t client id for corresponding mac address or client count if not found
+ */
 static uint8_t find_client_id_with_mac(const uint8_t *mac_addr) {
     for (uint8_t i = 0; i < NETWORK_CLIENT_COUNT; i++) {
         const int result = memcmp(mac_addr, network_client_macs[i], ESP_NOW_ETH_ALEN);
@@ -91,6 +132,21 @@ static uint8_t find_client_id_with_mac(const uint8_t *mac_addr) {
             return i;
     }
     return NETWORK_CLIENT_COUNT;
+}
+
+/**
+ * @brief have all the clients checked in with the controller
+ * @return bool true if all the clients have checked in
+ */
+static bool all_clients_checked_in() {
+    bool all_checked_in = true;
+    for (uint8_t i = 0; i < NETWORK_CLIENT_COUNT; i++) {
+        if (network_client_states[i] != NETWORK_CONN_STATE_READY) {
+            all_checked_in = false;
+            break;
+        }
+    }
+    return all_checked_in;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -150,7 +206,7 @@ static void network_receive_callback(const esp_now_recv_info_t *recv_info, const
 
     struct network_event evt;
     struct network_receive_event *recv_evt = &evt.data.receive_event;
-    evt.event_id = NETWORK_EVENT_RECEIVE;
+    evt.event_type_id = NETWORK_EVENT_RECEIVE;
     memcpy(recv_evt->mac_addr, src_addr, ESP_NOW_ETH_ALEN);
     recv_evt->data = malloc(len); // this will be need to be freed by function that processes the queue
     if (recv_evt->data == NULL) {
@@ -177,7 +233,7 @@ static void network_send_callback(const uint8_t *mac_addr, const esp_now_send_st
     }
 
     struct network_event event;
-    event.event_id = NETWORK_EVENT_SEND;
+    event.event_type_id = NETWORK_EVENT_SEND;
     struct network_send_event *send_event = &event.data.send_event;
     send_event->status = status;
     memcpy(send_event->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
@@ -246,6 +302,89 @@ static void network_stop() {
 // NETWORK MESSAGE METHODS
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief get the message type id for the given header
+ * @param hdr - pointer to network_msg_hdr header to get the message type of
+ * @return uint8_t id for the message type for the given header
+ */
+static uint8_t get_msg_type(const struct network_msg_header *hdr) {
+    uint32_t type_mask = 15; // 0000 0000 0000 0000 0000 0000 0000 1111
+    type_mask <<= 27; //        0111 1000 0000 0000 0000 0000 0000 0000
+    const uint32_t type = (hdr->flags & type_mask) >> 27;
+    return (uint8_t)type;
+}
+
+static uint8_t get_msg_client_id(const struct network_msg_header *hdr) {
+    uint32_t type_mask = 15; // 0000 0000 0000 0000 0000 0000 0000 1111
+    type_mask <<= 23; //        0000 0111 1000 0000 0000 0000 0000 0000
+    const uint32_t client_id = (hdr->flags & type_mask) >> 23;
+    return (uint8_t)client_id;
+}
+
+static int parse_msg(const uint8_t *msg, const size_t msg_len, struct network_msg_header **hdr) {
+    if (msg_len < sizeof(struct network_msg_header))
+        return ESP_FAIL;
+
+    *hdr = (struct network_msg_header *)msg;
+
+    // is it magical
+    if ((*hdr)->magic != network_msg_magic) {
+        ESP_LOGW(LOG_TAG, "message has wrong magic.");
+        return ESP_FAIL;
+    }
+
+    // CRC check
+    const uint16_t crc = (*hdr)->crc;
+    (*hdr)->crc = 0;
+    const uint16_t crc_cal = esp_crc16_le(UINT16_MAX, msg, msg_len);
+
+    ESP_LOGD(LOG_TAG, "CRC: 0x%04X", crc);
+    ESP_LOGD(LOG_TAG, "CRC CALC: 0x%04X", crc_cal);
+    if (crc_cal != crc) {
+        ESP_LOGW(LOG_TAG, "CRC CHECK FAILED: 0x%04X 0x%04X", crc, crc_cal);
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+static uint32_t build_msg_flags(const uint8_t protocol, const uint8_t msg_type) {
+    // |0                |0000        |0000     |00000000   |000000000000000|
+    // |broadcast/unicast|message type|client id|msg_len    |unused         |
+    uint32_t flags = protocol;
+    flags <<= 4; // width of message type 4 bits
+    flags = flags | msg_type;
+    flags <<= 4; // width of client id
+    flags |= network_client_id;
+    flags <<= 8; // width of message length
+    flags |= 0; // unicast register ack message contains no data
+    flags <<= 15; // left over bits
+    return flags;
+}
+
+static int send_registration_ack_message(const uint8_t *mac_addr) {
+    const uint32_t flags = build_msg_flags(NETWORK_MSG_UNICAST, NETWORK_MSG_TYPE_REG_ACK);
+    struct network_msg_header *hdr = (struct network_msg_header *)msg_buffer;
+    hdr->flags = flags;
+    hdr->magic = network_msg_magic;
+    hdr->crc = 0;
+    hdr->crc = esp_crc16_le(UINT16_MAX, msg_buffer, network_reg_ack_msg_size);
+    const esp_err_t result = esp_now_send(mac_addr, msg_buffer, network_reg_ack_msg_size);
+    ESP_LOGI(LOG_TAG, "register-ack message sent: %d", result);
+    return result;
+}
+
+static int send_broadcast_register_message() {
+    const uint32_t flags = build_msg_flags(NETWORK_MSG_BROADCAST, NETWORK_MSG_TYPE_REG);
+    struct network_msg_header *hdr = (struct network_msg_header *)msg_buffer;
+    hdr->flags = flags;
+    hdr->magic = network_msg_magic;
+    hdr->crc = 0;
+    hdr->crc = esp_crc16_le(UINT16_MAX, msg_buffer, network_reg_msg_size);
+    const esp_err_t result = esp_now_send(network_broadcast_mac, msg_buffer, network_reg_msg_size);
+    ESP_LOGI(LOG_TAG, "Broadcast register message sent: %d", result);
+    return result;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // NETWORK QUEUE PROCESSORS
 ///////////////////////////////////////////////////////////////////////////////
@@ -253,8 +392,8 @@ static void network_stop() {
 static int esp_now_controller_process() {
     struct network_event event;
     while (xQueueReceive(network_event_queue, &event, 0) == pdTRUE) {
-        ESP_LOGI(LOG_TAG, "Received event: %d", event.event_id);
-        if (event.event_id == NETWORK_EVENT_SEND) {
+        ESP_LOGI(LOG_TAG, "Received event: %d", event.event_type_id);
+        if (event.event_type_id == NETWORK_EVENT_SEND) {
             const bool is_broadcast = memcmp(event.data.send_event.mac_addr, network_broadcast_mac, ESP_NOW_ETH_ALEN) == 0;
             uint8_t client_id = 0; // what client did we send this message to
             if (!is_broadcast)
@@ -272,30 +411,29 @@ static int esp_now_controller_process() {
             } else { // send was a failure, the destination didn't acknowledge
                 // if there is a failure, and it's not a broadcast message, and it's a reg-ack, resend
                 if (!is_broadcast && client_id < NETWORK_CLIENT_COUNT && network_client_states[client_id] == NETWORK_CONN_STATE_REG_ACK) {
-                    send_registration_ack_message(event.data.send_event.mac_addr, NETWORK_CLIENT_CONTROLLER);
+                    send_registration_ack_message(event.data.send_event.mac_addr);
                 }
             }
-        } else if (event.event_id == ESP_NOW_EVENT_RECEIVE) {
-            // verify message header CRC and magic
-            const struct esp_now_receive_event *receive_event = &event.data.receive_event;
-            struct esp_now_msg_header *hdr;
-            if (esp_now_parse_message(receive_event->data, receive_event->data_len, &hdr) != ESP_OK)
+        } else if (event.event_type_id == NETWORK_EVENT_RECEIVE) {
+            const struct network_receive_event *receive_event = &event.data.receive_event;
+            struct network_msg_header *hdr;
+            if (parse_msg(receive_event->data, receive_event->data_len, &hdr) != ESP_OK)
                 continue;
-            // if reg-ack message does it matter what state we are in no we'll just respond no matter what
-            if (get_message_type(hdr) == ESP_NOW_MSG_TYPE_REG_ACK) {
-                const uint8_t client_id = get_message_client_id(hdr);
-                memcpy(client_macs[client_id], receive_event->mac_addr, ESP_NOW_ETH_ALEN); // save mac for the given client
-                add_peer(receive_event->mac_addr);
+            // if reg-ack message does it matter what state we are in, no we'll just respond no matter what
+            if (get_msg_type(hdr) == NETWORK_MSG_TYPE_REG_ACK) {
+                const uint8_t client_id = get_msg_client_id(hdr);
+                memcpy(network_client_macs[client_id], receive_event->mac_addr, ESP_NOW_ETH_ALEN); // save mac for the given client
+                network_add_peer(receive_event->mac_addr);
                 // send reg-ack message to client completing registration
-                if (send_registration_ack_message(receive_event->mac_addr, ESP_NOW_CONTROLLER_CLIENT) == ESP_OK)
-                    client_states[client_id] = ESP_NOW_CONN_STATE_REG_ACK; // update client state to reg-ack
+                if (send_registration_ack_message(receive_event->mac_addr) == ESP_OK)
+                    network_client_states[client_id] = NETWORK_CONN_STATE_REG_ACK; // update client state to reg-ack
             }
         }
     }
 
-    if (esp_now_conn_state == ESP_NOW_CONN_STATE_REG) {
+    if (network_conn_state == NETWORK_CONN_STATE_REG) {
         if (all_clients_checked_in())
-            esp_now_conn_state = ESP_NOW_CONN_STATE_READY;
+            network_conn_state = NETWORK_CONN_STATE_READY;
         else
             return send_broadcast_register_message();
     }
@@ -345,12 +483,12 @@ void network_task(void *pvParameter) {
         network_client_states[i] = NETWORK_CONN_STATE_REG;
     }
 
-    msg_buffer = malloc(network_largest_message_size);
+    msg_buffer = malloc(network_largest_msg_size);
     if (msg_buffer == NULL) {
         ESP_LOGE(LOG_TAG, "message buffer allocation failed!");
         goto graceful_exit;
     }
-    memset(msg_buffer, 0, network_largest_message_size);
+    memset(msg_buffer, 0, network_largest_msg_size);
 
     int result = ESP_OK;
 

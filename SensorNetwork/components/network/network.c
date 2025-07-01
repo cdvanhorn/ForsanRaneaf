@@ -321,6 +321,13 @@ static uint8_t get_msg_client_id(const struct network_msg_header *hdr) {
     return (uint8_t)client_id;
 }
 
+/**
+ * @brief parse a message, check the CRC and that it contains the correct magic number
+ * @param msg uint8_t pointer to byte array contains the message bytes
+ * @param msg_len size_t, how many bytes in the message
+ * @param hdr network_msg_header pointer will contain pointer to header after parsing
+ * @return 0 on success -1 on failure
+ */
 static int parse_msg(const uint8_t *msg, const size_t msg_len, struct network_msg_header **hdr) {
     if (msg_len < sizeof(struct network_msg_header))
         return ESP_FAIL;
@@ -347,6 +354,12 @@ static int parse_msg(const uint8_t *msg, const size_t msg_len, struct network_ms
     return ESP_OK;
 }
 
+/**
+ * @brief generate the flag bitfield for a message
+ * @param protocol uint8_t is this a broadcast or unicast message
+ * @param msg_type uint8_t what type of message is this
+ * @return uint32_t flags to place in your message
+ */
 static uint32_t build_msg_flags(const uint8_t protocol, const uint8_t msg_type) {
     // |0                |0000        |0000     |00000000   |000000000000000|
     // |broadcast/unicast|message type|client id|msg_len    |unused         |
@@ -361,6 +374,11 @@ static uint32_t build_msg_flags(const uint8_t protocol, const uint8_t msg_type) 
     return flags;
 }
 
+/**
+ * @brief send a registration-ack message to the given mac address
+ * @param mac_addr uint8_t byte array mac address to send message to
+ * @return 0 on success 1 on failure result of esp_now_send
+ */
 static int send_registration_ack_message(const uint8_t *mac_addr) {
     const uint32_t flags = build_msg_flags(NETWORK_MSG_UNICAST, NETWORK_MSG_TYPE_REG_ACK);
     struct network_msg_header *hdr = (struct network_msg_header *)msg_buffer;
@@ -373,6 +391,10 @@ static int send_registration_ack_message(const uint8_t *mac_addr) {
     return result;
 }
 
+/**
+ * @brief send a register broadcast message
+ * @return 0 on success 1 on failure result of esp_now_send
+ */
 static int send_broadcast_register_message() {
     const uint32_t flags = build_msg_flags(NETWORK_MSG_BROADCAST, NETWORK_MSG_TYPE_REG);
     struct network_msg_header *hdr = (struct network_msg_header *)msg_buffer;
@@ -389,7 +411,10 @@ static int send_broadcast_register_message() {
 // NETWORK QUEUE PROCESSORS
 ///////////////////////////////////////////////////////////////////////////////
 
-static int esp_now_controller_process() {
+/**
+ * @brief process the event queue as a controller
+ */
+static void network_controller_process() {
     struct network_event event;
     while (xQueueReceive(network_event_queue, &event, 0) == pdTRUE) {
         ESP_LOGI(LOG_TAG, "Received event: %d", event.event_type_id);
@@ -417,8 +442,10 @@ static int esp_now_controller_process() {
         } else if (event.event_type_id == NETWORK_EVENT_RECEIVE) {
             const struct network_receive_event *receive_event = &event.data.receive_event;
             struct network_msg_header *hdr;
-            if (parse_msg(receive_event->data, receive_event->data_len, &hdr) != ESP_OK)
+            if (parse_msg(receive_event->data, receive_event->data_len, &hdr) != ESP_OK) {
+                free(receive_event->data);
                 continue;
+            }
             // if reg-ack message does it matter what state we are in, no we'll just respond no matter what
             if (get_msg_type(hdr) == NETWORK_MSG_TYPE_REG_ACK) {
                 const uint8_t client_id = get_msg_client_id(hdr);
@@ -428,6 +455,7 @@ static int esp_now_controller_process() {
                 if (send_registration_ack_message(receive_event->mac_addr) == ESP_OK)
                     network_client_states[client_id] = NETWORK_CONN_STATE_REG_ACK; // update client state to reg-ack
             }
+            free(receive_event->data);
         }
     }
 
@@ -435,12 +463,59 @@ static int esp_now_controller_process() {
         if (all_clients_checked_in())
             network_conn_state = NETWORK_CONN_STATE_READY;
         else
-            return send_broadcast_register_message();
+            send_broadcast_register_message();
     }
-
-    return ESP_OK;
 }
 
+/**
+ * @brief process the event queue as a client
+ */
+static void network_client_process() {
+    struct network_event event;
+    while (xQueueReceive(network_event_queue, &event, 0) == pdTRUE) {
+        ESP_LOGI(LOG_TAG, "Received event: %d", event.event_type_id);
+        if (event.event_type_id == NETWORK_EVENT_SEND) {
+            if (event.data.send_event.status == ESP_NOW_SEND_SUCCESS) {
+                ESP_LOGI(LOG_TAG, "message sent successfully!");
+            } else {
+                if (network_conn_state == NETWORK_CONN_STATE_REG_ACK) {
+                    ESP_LOGI(LOG_TAG, "register ack message failed to send, reset state to register");
+                    network_conn_state = NETWORK_CONN_STATE_REG;
+                }
+            }
+        } else if (event.event_type_id == NETWORK_EVENT_RECEIVE) {
+            const struct network_receive_event *receive_event = &event.data.receive_event;
+            struct network_msg_header *hdr;
+            if (parse_msg(receive_event->data, receive_event->data_len, &hdr) != ESP_OK) {
+                free(receive_event->data);
+                continue;
+            }
+            if (network_conn_state == NETWORK_CONN_STATE_REG) {
+                if (get_msg_type(hdr) == NETWORK_MSG_TYPE_REG) {
+                    network_add_peer(receive_event->mac_addr);
+                    if (send_registration_ack_message(receive_event->mac_addr) == ESP_OK)
+                        network_conn_state = NETWORK_CONN_STATE_REG_ACK;
+                }
+            } else if (network_conn_state == NETWORK_CONN_STATE_REG_ACK) {
+                // make sure this is a register-ack message type
+                // change connection state to ready
+                if (get_msg_type(hdr) == NETWORK_MSG_TYPE_REG_ACK && get_msg_client_id(hdr) == NETWORK_CLIENT_CONTROLLER) {
+                    network_conn_state = NETWORK_CONN_STATE_READY;
+                    ESP_LOGI(LOG_TAG, "connection to controller ready!");
+                }
+            } else if (network_conn_state == NETWORK_CONN_STATE_READY) {
+                // take action based on the message type
+            }
+            free(receive_event->data);
+        }
+    }
+}
+
+
+/**
+ * @brief setup network node and begin handling network events
+ * @param pvParameter void pointer should point to a network_config struct to configure the network node
+ */
 void network_task(void *pvParameter) {
     struct network_config *ncfg = (struct network_config *)pvParameter;
     network_client_id = ncfg->client_id;
@@ -490,22 +565,16 @@ void network_task(void *pvParameter) {
     }
     memset(msg_buffer, 0, network_largest_msg_size);
 
-    int result = ESP_OK;
-
     // ReSharper disable once CppDFAEndlessLoop
     while (1) {
         // TODO: Check if someone says we should shutdown
 
-        // if (esp_now_mode == ESP_NOW_CLIENT_MODE)
-        //     result = esp_now_client_process();
+        if (network_mode == NETWORK_MODE_CLIENT)
+            network_client_process();
         if (network_mode == NETWORK_MODE_CONTROLLER)
-            result = esp_now_controller_process();
+            network_controller_process();
 
         // TODO: Change led color based on connection status, need to create led component to do this properly
-
-        if (result != ESP_OK) { // catastrophic failure try restart?
-            break;
-        }
 
         vTaskDelay(250 / portTICK_PERIOD_MS);
     }

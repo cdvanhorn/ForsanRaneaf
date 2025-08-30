@@ -223,11 +223,11 @@ static void network_receive_callback(const esp_now_recv_info_t *recv_info, const
 
 /**
  * @brief callback triggered when an esp-now message is sent, create event and place on queue for processing
- * @param mac_addr - byte array contains mac address of destination
+ * @param tx_info - structure containing transmission information
  * @param status - esp_now_send_status_t status of sent message
  */
-static void network_send_callback(const uint8_t *mac_addr, const esp_now_send_status_t status) {
-    if (mac_addr == NULL) {
+static void network_send_callback(const esp_now_send_info_t *tx_info, esp_now_send_status_t status) {
+    if (tx_info == NULL) {
         ESP_LOGE(LOG_TAG, "send call back argument error.");
         return;
     }
@@ -236,7 +236,7 @@ static void network_send_callback(const uint8_t *mac_addr, const esp_now_send_st
     event.event_type_id = NETWORK_EVENT_SEND;
     struct network_send_event *send_event = &event.data.send_event;
     send_event->status = status;
-    memcpy(send_event->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
+    memcpy(send_event->mac_addr, tx_info->des_addr, ESP_NOW_ETH_ALEN);
 
     if (xQueueSend(network_event_queue, &event, NETWORK_EVENT_QUEUE_MAX_DELAY) != pdTRUE) {
         ESP_LOGW(LOG_TAG, "send callback queue send failed.");

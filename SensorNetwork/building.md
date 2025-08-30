@@ -13,3 +13,11 @@ cd esp-idf
 ./install.sh esp32s3
 . $HOME/Projects/esp/esp-idf/export.sh # to put esp32 tools in path
 ```
+
+```shell
+cd Projects/esp32/esp-idf
+git fetch
+git checkout v5.5
+./install.sh esp32s3
+. $HOME/Projects/esp/esp-idf/export.sh # to put esp32 tools in path
+```

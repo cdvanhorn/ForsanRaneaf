@@ -14,6 +14,21 @@
 
 static const char *LOG_TAG = "can_network"; //!< char pointer - logging group
 
+static IRAM_ATTR bool twai_sender_tx_done_callback(twai_node_handle_t handle, const twai_tx_done_event_data_t *edata, void *user_ctx)
+{
+    if (!edata->is_tx_success) {
+        ESP_EARLY_LOGW(LOG_TAG, "Failed to transmit message, ID: 0x%X", edata->done_tx_frame->header.id);
+    }
+    return false; // No task wake required
+}
+
+// Bus error callback
+static IRAM_ATTR bool twai_sender_on_error_callback(twai_node_handle_t handle, const twai_error_event_data_t *edata, void *user_ctx)
+{
+    ESP_EARLY_LOGW(LOG_TAG, "TWAI node error: 0x%x", edata->err_flags.val);
+    return false; // No task wake required
+}
+
 /**
  * @brief setup can interface and start monitoring a can bus
  * @param pvParameter void pointer will eventually contain any can bus config
@@ -28,9 +43,26 @@ void can_task(void *pvParameter) {
     };
     // Create a new TWAI controller driver instance
     ESP_ERROR_CHECK(twai_new_node_onchip(&node_config, &node_hdl));
+    twai_event_callbacks_t callbacks = {
+        .on_tx_done = twai_sender_tx_done_callback,
+        .on_error = twai_sender_on_error_callback,
+    };
+    ESP_ERROR_CHECK(twai_node_register_event_callbacks(node_hdl, &callbacks, NULL));
     // Start the TWAI controller
     ESP_ERROR_CHECK(twai_node_enable(node_hdl));
     ESP_LOGI(LOG_TAG, "CAN bus TWAI controller started!");
+
+    // let's see if we can send a can message
+    uint8_t send_buff[1];
+    send_buff[0] = 0x00;
+    twai_frame_t tx_msg = {
+        .header.id = 0x213,           // Message ID
+        .header.ide = true,         // Use 29-bit extended ID format
+        .buffer = send_buff,        // Pointer to data to transmit
+        .buffer_len = sizeof(send_buff),  // Length of data to transmit
+    };
+    ESP_ERROR_CHECK(twai_node_transmit(node_hdl, &tx_msg, 0));
+    ESP_LOGI(LOG_TAG, "Sending config request message");
 
     // ReSharper disable once CppDFAEndlessLoop
     while (1) {

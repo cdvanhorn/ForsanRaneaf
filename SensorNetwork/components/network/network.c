@@ -13,7 +13,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 #define WIFI_PRIMARY_CHANNEL                    10
 
-#define NETWORK_EVENT_QUEUE_SIZE                10
+#define NETWORK_EVENT_QUEUE_SIZE                50
 #define NETWORK_EVENT_QUEUE_MAX_DELAY           512
 
 #define NETWORK_CONN_STATE_REG                  0
@@ -574,7 +574,8 @@ void network_task(void *pvParameter) {
         if (network_mode == NETWORK_MODE_CONTROLLER)
             network_controller_process();
 
-        // TODO: Change led color based on connection status, need to create led component to do this properly
+        // TODO: Figure out how much memory we're using
+        // uxTaskGetStackHighWaterMark(NULL)
 
         vTaskDelay(250 / portTICK_PERIOD_MS);
     }

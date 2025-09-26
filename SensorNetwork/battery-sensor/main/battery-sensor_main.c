@@ -7,60 +7,19 @@
 #include "freertos/FreeRTOS.h"
 #include "nvs_flash.h"
 
-#include "esp_twai.h"
-#include "esp_twai_onchip.h"
-
+#include "can_network.h"
 #include "network.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // DEFINES
 ///////////////////////////////////////////////////////////////////////////////
+static const char *LOG_TAG = "main"; //!< char pointer - logging group
 #define CAN_MESSAGE_QUEUE_SIZE              200
-
-///////////////////////////////////////////////////////////////////////////////
-// COMPONENT DATA TYPES
-///////////////////////////////////////////////////////////////////////////////
-struct can_message {
-    twai_frame_t frame;
-    uint8_t data[TWAI_FRAME_MAX_LEN];
-};
 
 ///////////////////////////////////////////////////////////////////////////////
 // COMPONENT VARIABLES
 ///////////////////////////////////////////////////////////////////////////////
-static const char *LOG_TAG = "can_network"; //!< char pointer - logging group
 static QueueHandle_t can_message_queue = NULL; //!< QueueHandle_t esp_now queue that will hole can messages to be processed
-
-///////////////////////////////////////////////////////////////////////////////
-// CAN/TWAI CALLBACKS
-///////////////////////////////////////////////////////////////////////////////
-static IRAM_ATTR bool twai_sender_tx_done_callback(twai_node_handle_t handle, const twai_tx_done_event_data_t *edata, void *user_ctx)
-{
-    if (!edata->is_tx_success) {
-        ESP_EARLY_LOGW(LOG_TAG, "Failed to transmit message, ID: 0x%X", edata->done_tx_frame->header.id);
-    }
-    return false; // No task wake required
-}
-
-// Bus error callback
-static IRAM_ATTR bool twai_sender_on_error_callback(twai_node_handle_t handle, const twai_error_event_data_t *edata, void *user_ctx)
-{
-    ESP_EARLY_LOGW(LOG_TAG, "TWAI node error: 0x%x", edata->err_flags.val);
-    return false; // No task wake required
-}
-
-static bool IRAM_ATTR twai_listener_rx_callback(twai_node_handle_t handle, const twai_rx_done_event_data_t *edata, void *user_ctx)
-{
-    QueueHandle_t *queue = (QueueHandle_t *)user_ctx;
-
-    struct can_message msg;
-    msg.frame.buffer = msg.data;
-    msg.frame.buffer_len = sizeof(msg.data);
-    if (twai_node_receive_from_isr(handle, &msg.frame) == ESP_OK) {
-        xQueueSendFromISR(*queue, &msg, NULL);
-    }
-    return false;
-}
 
 /**
  * @brief setup can interface and start monitoring a can bus
@@ -73,36 +32,10 @@ void can_task(void *pvParameter) {
         goto graceful_exit;
     }
 
-    twai_node_handle_t node_hdl = NULL;
-    twai_onchip_node_config_t node_config = {
-        .io_cfg.tx = 4,             // TWAI TX GPIO pin
-        .io_cfg.rx = 5,             // TWAI RX GPIO pin
-        .bit_timing.bitrate = 500000,  // 500 kbps bitrate
-        .tx_queue_depth = 5,        // Transmit queue depth set to 5
-    };
-    // Create a new TWAI controller driver instance
-    ESP_ERROR_CHECK(twai_new_node_onchip(&node_config, &node_hdl));
-    twai_event_callbacks_t callbacks = {
-        .on_rx_done = twai_listener_rx_callback,
-        .on_tx_done = twai_sender_tx_done_callback,
-        .on_error = twai_sender_on_error_callback,
-    };
-    ESP_ERROR_CHECK(twai_node_register_event_callbacks(node_hdl, &callbacks,  &can_message_queue));
-    // Start the TWAI controller
-    ESP_ERROR_CHECK(twai_node_enable(node_hdl));
-    ESP_LOGI(LOG_TAG, "CAN bus TWAI controller started!");
-
-    // let's see if we can send a can message
-    uint8_t send_buff[8];
-    send_buff[0] = 0x11;
-    twai_frame_t tx_msg = {
-        .header.id = 0x213,           // Message ID
-        .header.ide = false,         // Use 29-bit extended ID format
-        .buffer = send_buff,        // Pointer to data to transmit
-        .buffer_len = sizeof(send_buff),  // Length of data to transmit
-    };
-    ESP_ERROR_CHECK(twai_node_transmit(node_hdl, &tx_msg, 0));
-    ESP_LOGI(LOG_TAG, "Sending config request message");
+    struct can_network_config network_config;
+    network_config.can_message_queue = &can_message_queue;
+    can_network_start(&network_config);
+    // ESP_LOGI(LOG_TAG, "Sending config request message");
 
     // create a queue to hold CAN messages
     // create call back on receive CAN message place it on the queue
@@ -125,13 +58,13 @@ void can_task(void *pvParameter) {
                      msg.frame.buffer[5],
                      msg.frame.buffer[6],
                      msg.frame.buffer[7]);
-            // ESP_LOGI(LOG_TAG, "Received message");
         }
 
         vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 
 graceful_exit: // cleanup
+    can_network_stop();
     if (can_message_queue != NULL) {
         vQueueDelete(can_message_queue);
         can_message_queue = NULL;

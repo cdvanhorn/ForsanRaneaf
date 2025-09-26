@@ -30,10 +30,10 @@ static bool IRAM_ATTR twai_listener_rx_callback(twai_node_handle_t handle, const
 {
     QueueHandle_t *queue = (QueueHandle_t *)user_ctx;
 
-    struct can_message msg;
-    msg.frame.buffer = msg.data;
-    msg.frame.buffer_len = sizeof(msg.data);
-    if (twai_node_receive_from_isr(handle, &msg.frame) == ESP_OK) {
+    struct can_message *msg = (struct can_message *)calloc(1, sizeof(struct can_message));
+    msg->frame.buffer = msg->data;
+    msg->frame.buffer_len = sizeof(msg->data);
+    if (twai_node_receive_from_isr(handle, &msg->frame) == ESP_OK) {
         xQueueSendFromISR(*queue, &msg, NULL);
     }
     return false;
@@ -44,7 +44,7 @@ static bool IRAM_ATTR twai_listener_rx_callback(twai_node_handle_t handle, const
  * @param id unsigned 32-bit integer - id of can message
  * @param buffer byte buffer data to send in can message
  */
-void send_message(uint32_t id, uint8_t *buffer) {
+void can_network_send_message(uint32_t id, uint8_t *buffer) {
     // let's see if we can send a can message
     // uint8_t send_buff[8];
     // send_buff[0] = 0x11;

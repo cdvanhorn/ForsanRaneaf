@@ -27,7 +27,7 @@ struct can_message {
     uint8_t data[TWAI_FRAME_MAX_LEN]; //!< byte array to hold can data
 };
 
-extern void send_message(uint32_t id, uint8_t *buffer);
+extern void can_network_send_message(uint32_t id, uint8_t *buffer);
 extern void can_network_start(void *pvParameter);
 extern void can_network_stop();
 

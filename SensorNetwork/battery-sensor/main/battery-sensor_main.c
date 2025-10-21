@@ -14,23 +14,31 @@
 // DEFINES
 ///////////////////////////////////////////////////////////////////////////////
 static const char *LOG_TAG = "bsen_main"; //!< char pointer - logging group
-#define CAN_MESSAGE_QUEUE_SIZE              200
-#define LOOP_SLEEP_TIME_MS                  50
-#define LOOPS_BETWEEN_MCU_CONFIG_REQUEST    600
-#define MCU_MSG_CONFIG_REPLY                403 // 0x193
-#define MCU_MSG_CONFIG_OPTIONS              0
-#define MCU_MSG_CONFIG_CHARGE_OPTIONS_ONE   1
-#define MCU_MSG_CONFIG_CHARGE_OPTIONS_TWO   2
-#define MCU_MSG_CONFIG_CHARGE_OPTIONS_THREE 3
-#define MCU_MSG_CONFIG_CHARGE_OPTIONS_FOUR  4
-#define MCU_MSG_CONFIG_CHARGE_OPTIONS_FIVE  5
-#define MCU_MSG_CONFIG_CHARGE_OPTIONS_SIX   6
-#define MCU_MSG_CONFIG_MCU_CONFIG           16 // 0x10
-#define MCU_MSG_CONFIG_BMS_OPTIONS_ONE      17 // 0x11
-#define MCU_MSG_CONFIG_BMS_OPTIONS_TWO      18 // 0x12
-#define MCU_MSG_CONFIG_GROUP_MAP_ONE        24 // 0x18
-#define MCU_MSG_CONFIG_GROUP_MAP_TWO        25 // 0x19
-#define MCU_MSG_CONFIG_GROUP_MAP_THREE      26 // 0x18
+#define CAN_MESSAGE_QUEUE_SIZE                  200
+#define LOOP_SLEEP_TIME_MS                      50
+#define LOOPS_BETWEEN_MCU_CONFIG_REQUEST        600
+#define LOOPS_BETWEEN_MCU_STATUS_REQUEST        40
+#define MCU_STATUS_REFRESH_RATE                 0x14  // 0x14 is a one-second rate 20 * 50ms = 1000ms 0x0A is a half second rate 10 * 50ms = 500ms
+#define MCU_MSG_CONFIG_REPLY                    403 // 0x193
+#define MCU_MSG_CONFIG_OPTIONS                  0
+#define MCU_MSG_CONFIG_CHARGE_OPTIONS_ONE       1
+#define MCU_MSG_CONFIG_CHARGE_OPTIONS_TWO       2
+#define MCU_MSG_CONFIG_CHARGE_OPTIONS_THREE     3
+#define MCU_MSG_CONFIG_CHARGE_OPTIONS_FOUR      4
+#define MCU_MSG_CONFIG_CHARGE_OPTIONS_FIVE      5
+#define MCU_MSG_CONFIG_CHARGE_OPTIONS_SIX       6
+#define MCU_MSG_CONFIG_MCU_CONFIG               16 // 0x10
+#define MCU_MSG_CONFIG_BMS_OPTIONS_ONE          17 // 0x11
+#define MCU_MSG_CONFIG_BMS_OPTIONS_TWO          18 // 0x12
+#define MCU_MSG_CONFIG_GROUP_MAP_ONE            24 // 0x18
+#define MCU_MSG_CONFIG_GROUP_MAP_TWO            25 // 0x19
+#define MCU_MSG_CONFIG_GROUP_MAP_THREE          26 // 0x18
+#define MCU_STATUS_SUMMARY_BYTE                 1
+#define MCU_STATUS_PACK_SUMMARY_BYTE            2
+#define MCU_STATUS_CELL_VOLTAGE_SUMMARY_BYTE    3
+#define MCU_STATUS_THERMISTOR_SUMMARY_BYTE      4
+#define MCU_STATUS_STATE_OF_CHARGE_BYTE         5
+#define MCU_STATUS_CELL_MAP_SUMMARY_BYTE        6
 
 ///////////////////////////////////////////////////////////////////////////////
 // COMPONENT DATA TYPES
@@ -148,6 +156,43 @@ void request_mcu_config(int request_type) {
     }
 }
 
+void request_mcu_status(int request_type) {
+    uint8_t bytes[8];
+    bytes[0] = 0x00;
+    bytes[1] = 0x00;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
+
+    if (request_type == MCU_STATUS_SUMMARY_BYTE) {
+        bytes[MCU_STATUS_SUMMARY_BYTE] = MCU_STATUS_REFRESH_RATE;
+        can_network_send_message(0x313, bytes);
+    }
+    if (request_type == MCU_STATUS_PACK_SUMMARY_BYTE) {
+        bytes[MCU_STATUS_PACK_SUMMARY_BYTE] = MCU_STATUS_REFRESH_RATE;
+        can_network_send_message(0x313, bytes);
+    }
+    if (request_type == MCU_STATUS_CELL_VOLTAGE_SUMMARY_BYTE) {
+        bytes[MCU_STATUS_CELL_VOLTAGE_SUMMARY_BYTE] = MCU_STATUS_REFRESH_RATE;
+        can_network_send_message(0x313, bytes);
+    }
+    if (request_type == MCU_STATUS_THERMISTOR_SUMMARY_BYTE) {
+        bytes[MCU_STATUS_THERMISTOR_SUMMARY_BYTE] = MCU_STATUS_REFRESH_RATE;
+        can_network_send_message(0x313, bytes);
+    }
+    if (request_type == MCU_STATUS_STATE_OF_CHARGE_BYTE) {
+        bytes[MCU_STATUS_STATE_OF_CHARGE_BYTE] = MCU_STATUS_REFRESH_RATE;
+        can_network_send_message(0x313, bytes);
+    }
+    if (request_type == MCU_STATUS_CELL_MAP_SUMMARY_BYTE) {
+        bytes[MCU_STATUS_CELL_MAP_SUMMARY_BYTE] = MCU_STATUS_REFRESH_RATE;
+        can_network_send_message(0x313, bytes);
+    }
+}
+
 void parse_mcu_message(struct can_message *msg) {
     if (msg->frame.header.dlc < 8)
         return;
@@ -242,6 +287,7 @@ void battery_sensor_task(void *pvParameter) {
     // place battery update message on queue for ESPNOW task
     struct can_message *msg = NULL;
     uint16_t loops_since_last_config_request = 0;
+    uint16_t loops_since_last_summary_request = 0;
     // ReSharper disable once CppDFAEndlessLoop
     while (1) {
         while (xQueueReceive(can_message_queue, &msg, 0) == pdTRUE) {
@@ -264,6 +310,12 @@ void battery_sensor_task(void *pvParameter) {
             // ESP_LOGI(LOG_TAG, "MCU Version: %d", mcu_config.version);
             // ESP_LOGI(LOG_TAG, "MCU Revision: %d", mcu_config.revision);
             // ESP_LOGI(LOG_TAG, "MCU Arch: %d", mcu_config.arch);
+        }
+        loops_since_last_summary_request++;
+        if (loops_since_last_summary_request > LOOPS_BETWEEN_MCU_STATUS_REQUEST) {
+            request_mcu_status(loops_since_last_summary_request - LOOPS_BETWEEN_MCU_STATUS_REQUEST);
+            if (loops_since_last_summary_request == LOOPS_BETWEEN_MCU_STATUS_REQUEST + 6)
+                loops_since_last_summary_request = 0;
         }
         loops_since_last_config_request++;
         if (loops_since_last_config_request > LOOPS_BETWEEN_MCU_CONFIG_REQUEST) {

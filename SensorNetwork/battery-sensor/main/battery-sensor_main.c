@@ -19,7 +19,9 @@ static const char *LOG_TAG = "bsen_main"; //!< char pointer - logging group
 #define LOOPS_BETWEEN_MCU_CONFIG_REQUEST        600
 #define LOOPS_BETWEEN_MCU_STATUS_REQUEST        40
 #define MCU_STATUS_REFRESH_RATE                 0x14  // 0x14 is a one-second rate 20 * 50ms = 1000ms 0x0A is a half second rate 10 * 50ms = 500ms
-#define MCU_MSG_CONFIG_REPLY                    403 // 0x193
+#define MCU_MSG_CONFIG_REPLY                    0x193 //403
+#define MCU_MSG_SUMMARY_REPLY                   0x293
+#define MCU_MSG_CELL_MAP_SUMMARY_REPLY          0x393
 #define MCU_MSG_CONFIG_OPTIONS                  0
 #define MCU_MSG_CONFIG_CHARGE_OPTIONS_ONE       1
 #define MCU_MSG_CONFIG_CHARGE_OPTIONS_TWO       2
@@ -39,10 +41,52 @@ static const char *LOG_TAG = "bsen_main"; //!< char pointer - logging group
 #define MCU_STATUS_THERMISTOR_SUMMARY_BYTE      4
 #define MCU_STATUS_STATE_OF_CHARGE_BYTE         5
 #define MCU_STATUS_CELL_MAP_SUMMARY_BYTE        6
+#define MCU_STATUS_SUMMARY_REPLY                1
+#define MCU_STATUS_PACK_SUMMARY_REPLY           2
+#define MCU_STATUS_CELL_VOLTAGE_SUMMARY_REPLY   3
+#define MCU_STATUS_THERMISTOR_SUMMARY_REPLY     4
+#define MCU_STATUS_STATE_OF_CHARGE_REPLY        5
 
 ///////////////////////////////////////////////////////////////////////////////
 // COMPONENT DATA TYPES
 ///////////////////////////////////////////////////////////////////////////////
+struct mcu_summary {
+    uint16_t charge_kw;
+    uint8_t charge_state;
+    uint8_t plug_state;
+    uint16_t alerts;
+    uint16_t pack_voltage;
+    uint16_t pack_current;
+    uint8_t cell_count;
+    uint16_t cell_voltage_low;
+    uint16_t cell_voltage_mean;
+    uint16_t cell_voltage_high;
+    uint8_t thermistor_count;
+    uint16_t thermistor_min;
+    uint16_t thermistor_max;
+    uint16_t thermistor_low;
+    uint16_t thermistor_high;
+    uint8_t state_of_charge;
+    uint16_t pack_kwh;
+    uint16_t pack_max_kwh;
+    uint64_t cell_group_0; // byte 0 - id, 1 - cm_12, 2 - cm_0/1, 3 - cm_2/3, 4 - cm_4/5, 5 - cm_6/7, 6 - cm_8/9, 7 - cm_10/11
+    uint64_t cell_group_1;
+    uint64_t cell_group_2;
+    uint64_t cell_group_3;
+    uint64_t cell_group_4;
+    uint64_t cell_group_5;
+    uint64_t cell_group_6;
+    uint64_t cell_group_7;
+    uint64_t cell_group_8;
+    uint64_t cell_group_9;
+    uint64_t cell_group_10;
+    uint64_t cell_group_11;
+    uint64_t cell_group_12;
+    uint64_t cell_group_13;
+    uint64_t cell_group_14;
+    uint64_t cell_group_15;
+};
+
 struct mcu_config {
     uint16_t evcc_options;
     uint16_t bms_options;
